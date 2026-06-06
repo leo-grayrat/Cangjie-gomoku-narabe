@@ -3,6 +3,7 @@ package Gomoku_narabe
 import std.net.*
 import std.convert.*
 import std.random.*
+import std.sync.*
 
 let BOARD_SIZE: Int64 = 15
 let CENTER: Int64 = BOARD_SIZE / 2
@@ -61,12 +62,13 @@ class GameState {
     var gameOver: Bool = false
     var winner: Int64 = 0
     var mode: String = "pvp"
+    var difficulty: String = "greedy"
     var moveCount: Int64 = 0
     var lastRow: Int64 = -1
     var lastCol: Int64 = -1
     var rng: Random = Random()
 
-    func reset(newMode: String) {
+    func reset(newMode: String, newDiff: String) {
         this.board = emptyBoard()
         this.currentPlayer = 1
         this.gameOver = false
@@ -78,6 +80,7 @@ class GameState {
         if (newMode == "ai") {
             this.mode = "ai"
         }
+        this.difficulty = newDiff
     }
 
     func isInside(row: Int64, col: Int64): Bool {
@@ -229,7 +232,7 @@ class GameState {
         return abs64(row - CENTER) + abs64(col - CENTER)
     }
 
-    func chooseAiMove(): Point {
+    func chooseGreedy(): Point {
         if (this.board[CENTER][CENTER] == 0) {
             return Point(CENTER, CENTER)
         }
@@ -286,6 +289,267 @@ class GameState {
         return Point(0, 0)
     }
 
+    func evaluate(): Int64 {
+        var score: Int64 = 0
+        for (row in 0..BOARD_SIZE) {
+            for (col in 0..BOARD_SIZE) {
+                let v = this.board[row][col]
+                if (v == 2) {
+                    score += this.pointScore(row, col, 2)
+                } else if (v == 1) {
+                    score -= this.pointScore(row, col, 1)
+                }
+            }
+        }
+        return score
+    }
+
+    func candidates(): Array<Point> {
+        if (this.moveCount == 0) {
+            let only = Array<Point>(1, { _ => Point(CENTER, CENTER) })
+            return only
+        }
+        var result = Array<Point>(BOARD_SIZE * BOARD_SIZE, { _ => Point(0, 0) })
+        var count: Int64 = 0
+        for (row in 0..BOARD_SIZE) {
+            for (col in 0..BOARD_SIZE) {
+                if (this.board[row][col] != 0) {
+                    continue
+                }
+                if (!this.hasNearbyStone(row, col, 2)) {
+                    continue
+                }
+                result[count] = Point(row, col)
+                count += 1
+            }
+        }
+        return result[0..count]
+    }
+
+    func minimax(depth: Int64, isMax: Bool): Int64 {
+        if (this.gameOver) {
+            if (this.winner == 2) { return 1_000_000 + depth }
+            if (this.winner == 1) { return -1_000_000 - depth }
+            return 0
+        }
+        if (depth == 0) {
+            return this.evaluate()
+        }
+        let pts = this.candidates()
+        if (pts.size == 0) {
+            return this.evaluate()
+        }
+        if (isMax) {
+            var best: Int64 = -2_000_000
+            for (p in pts) {
+                this.board[p.row][p.col] = 2
+                let prevOver = this.gameOver
+                let prevWinner = this.winner
+                let prevPlayer = this.currentPlayer
+                this.moveCount += 1
+                if (this.hasFive(p.row, p.col, 2)) {
+                    this.gameOver = true
+                    this.winner = 2
+                }
+                this.currentPlayer = 1
+                let v = this.minimax(depth - 1, false)
+                this.board[p.row][p.col] = 0
+                this.gameOver = prevOver
+                this.winner = prevWinner
+                this.currentPlayer = prevPlayer
+                this.moveCount -= 1
+                if (v > best) { best = v }
+            }
+            return best
+        } else {
+            var best: Int64 = 2_000_000
+            for (p in pts) {
+                this.board[p.row][p.col] = 1
+                let prevOver = this.gameOver
+                let prevWinner = this.winner
+                let prevPlayer = this.currentPlayer
+                this.moveCount += 1
+                if (this.hasFive(p.row, p.col, 1)) {
+                    this.gameOver = true
+                    this.winner = 1
+                }
+                this.currentPlayer = 2
+                let v = this.minimax(depth - 1, true)
+                this.board[p.row][p.col] = 0
+                this.gameOver = prevOver
+                this.winner = prevWinner
+                this.currentPlayer = prevPlayer
+                this.moveCount -= 1
+                if (v < best) { best = v }
+            }
+            return best
+        }
+    }
+
+    func chooseMinimax(): Point {
+        let pts = this.candidates()
+        var bestRow: Int64 = pts[0].row
+        var bestCol: Int64 = pts[0].col
+        var best: Int64 = -2_000_000
+        for (p in pts) {
+            this.board[p.row][p.col] = 2
+            let prevOver = this.gameOver
+            let prevWinner = this.winner
+            let prevPlayer = this.currentPlayer
+            this.moveCount += 1
+            if (this.hasFive(p.row, p.col, 2)) {
+                this.gameOver = true
+                this.winner = 2
+            }
+            this.currentPlayer = 1
+            let v = this.minimax(2, false)
+            this.board[p.row][p.col] = 0
+            this.gameOver = prevOver
+            this.winner = prevWinner
+            this.currentPlayer = prevPlayer
+            this.moveCount -= 1
+            if (v > best) {
+                best = v
+                bestRow = p.row
+                bestCol = p.col
+            }
+        }
+        return Point(bestRow, bestCol)
+    }
+
+    func alphaBeta(depth: Int64, alpha: Int64, beta: Int64, isMax: Bool): Int64 {
+        if (this.gameOver) {
+            if (this.winner == 2) { return 1_000_000 + depth }
+            if (this.winner == 1) { return -1_000_000 - depth }
+            return 0
+        }
+        if (depth == 0) {
+            return this.evaluate()
+        }
+        let pts = this.candidates()
+        if (pts.size == 0) {
+            return this.evaluate()
+        }
+        var a = alpha
+        var b = beta
+        if (isMax) {
+            var best: Int64 = -2_000_000
+            for (p in pts) {
+                this.board[p.row][p.col] = 2
+                let prevOver = this.gameOver
+                let prevWinner = this.winner
+                let prevPlayer = this.currentPlayer
+                this.moveCount += 1
+                if (this.hasFive(p.row, p.col, 2)) {
+                    this.gameOver = true
+                    this.winner = 2
+                }
+                this.currentPlayer = 1
+                let v = this.alphaBeta(depth - 1, a, b, false)
+                this.board[p.row][p.col] = 0
+                this.gameOver = prevOver
+                this.winner = prevWinner
+                this.currentPlayer = prevPlayer
+                this.moveCount -= 1
+                if (v > best) { best = v }
+                if (v > a) { a = v }
+                if (a >= b) { return best }
+            }
+            return best
+        } else {
+            var best: Int64 = 2_000_000
+            for (p in pts) {
+                this.board[p.row][p.col] = 1
+                let prevOver = this.gameOver
+                let prevWinner = this.winner
+                let prevPlayer = this.currentPlayer
+                this.moveCount += 1
+                if (this.hasFive(p.row, p.col, 1)) {
+                    this.gameOver = true
+                    this.winner = 1
+                }
+                this.currentPlayer = 2
+                let v = this.alphaBeta(depth - 1, a, b, true)
+                this.board[p.row][p.col] = 0
+                this.gameOver = prevOver
+                this.winner = prevWinner
+                this.currentPlayer = prevPlayer
+                this.moveCount -= 1
+                if (v < best) { best = v }
+                if (v < b) { b = v }
+                if (a >= b) { return best }
+            }
+            return best
+        }
+    }
+
+    func chooseAlphaBeta(): Point {
+        let pts = this.candidates()
+        var bestRow: Int64 = pts[0].row
+        var bestCol: Int64 = pts[0].col
+        var best: Int64 = -2_000_000
+        for (p in pts) {
+            this.board[p.row][p.col] = 2
+            let prevOver = this.gameOver
+            let prevWinner = this.winner
+            let prevPlayer = this.currentPlayer
+            this.moveCount += 1
+            if (this.hasFive(p.row, p.col, 2)) {
+                this.gameOver = true
+                this.winner = 2
+            }
+            this.currentPlayer = 1
+            let v = this.alphaBeta(4, -2_000_000, 2_000_000, false)
+            this.board[p.row][p.col] = 0
+            this.gameOver = prevOver
+            this.winner = prevWinner
+            this.currentPlayer = prevPlayer
+            this.moveCount -= 1
+            if (v > best) {
+                best = v
+                bestRow = p.row
+                bestCol = p.col
+            }
+        }
+        return Point(bestRow, bestCol)
+    }
+
+    func findWinningMove(stone: Int64): Int64 {
+        for (row in 0..BOARD_SIZE) {
+            for (col in 0..BOARD_SIZE) {
+                if (this.board[row][col] == 0 && this.pointScore(row, col, stone) >= 100000) {
+                    return row * BOARD_SIZE + col
+                }
+            }
+        }
+        return -1
+    }
+
+    func chooseSolver(): Point {
+        let win = this.findWinningMove(2)
+        if (win >= 0) {
+            return Point(win / BOARD_SIZE, win % BOARD_SIZE)
+        }
+        let block = this.findWinningMove(1)
+        if (block >= 0) {
+            return Point(block / BOARD_SIZE, block % BOARD_SIZE)
+        }
+        return this.chooseAlphaBeta()
+    }
+
+    func chooseAiMove(): Point {
+        if (this.difficulty == "minimax") {
+            return this.chooseMinimax()
+        }
+        if (this.difficulty == "alphabeta") {
+            return this.chooseAlphaBeta()
+        }
+        if (this.difficulty == "solver") {
+            return this.chooseSolver()
+        }
+        return this.chooseGreedy()
+    }
+
     func playerMove(row: Int64, col: Int64): ApiResult {
         if (this.gameOver) {
             return ApiResult(false, "游戏已经结束，请重新开始")
@@ -339,6 +603,7 @@ class GameState {
             + "\"message\":\"" + message + "\","
             + "\"size\":" + "${BOARD_SIZE}" + ","
             + "\"mode\":\"" + this.mode + "\","
+            + "\"difficulty\":\"" + this.difficulty + "\","
             + "\"currentPlayer\":" + "${this.currentPlayer}" + ","
             + "\"gameOver\":" + boolJson(this.gameOver) + ","
             + "\"winner\":" + "${this.winner}" + ","
@@ -351,6 +616,7 @@ class GameState {
 }
 
 let game = GameState()
+let gameMutex = Mutex()
 
 func httpResponse(status: String, contentType: String, body: String): Array<Byte> {
     let bodyBytes = body.toArray()
@@ -413,169 +679,167 @@ func indexPage(): String {
 <!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>仓颉五子棋</title>
 <style>
-body {
-  margin: 0;
-  font-family: sans-serif;
-  background: #f5f1e8;
-  color: #222;
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:#1a1a2e;color:#e0e0e0;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px}
+.wrap{width:100%;max-width:600px}
+h1{font-size:1.5rem;font-weight:600;letter-spacing:.05em;margin-bottom:16px;color:#f0c87a}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.ctrl{padding:7px 12px;border:1px solid #444;background:#2a2a3e;color:#ccc;border-radius:6px;cursor:pointer;font-size:13px;transition:background .15s,color .15s}
+.ctrl:hover{background:#3a3a5e;color:#fff}
+.ctrl.active{background:#f0c87a;color:#1a1a2e;border-color:#f0c87a;font-weight:600}
+#status{margin-bottom:12px;padding:9px 12px;background:#2a2a3e;border-radius:6px;font-size:14px;min-height:36px;border-left:3px solid #f0c87a}
+#status.loading{border-left-color:#888;color:#888}
+.board-wrap{position:relative;width:fit-content}
+#board{
+  display:grid;
+  grid-template-columns:repeat(${BOARD_SIZE},36px);
+  background:#c8933a;
+  padding:10px;
+  border-radius:8px;
+  gap:0;
+  box-shadow:0 8px 24px rgba(0,0,0,.5);
+  user-select:none
 }
-.wrap {
-  max-width: 900px;
-  margin: 24px auto;
-  padding: 16px;
+#board.locked{pointer-events:none;opacity:.7}
+.cell{
+  width:36px;height:36px;
+  border:none;
+  background:transparent;
+  cursor:pointer;
+  position:relative;
+  display:flex;align-items:center;justify-content:center
 }
-h1 {
-  margin-bottom: 12px;
+.cell::before,.cell::after{content:'';position:absolute;background:#7a5c20;pointer-events:none}
+.cell::before{width:100%;height:1px;top:50%;transform:translateY(-50%)}
+.cell::after{width:1px;height:100%;left:50%;transform:translateX(-50%)}
+.cell:first-child::before,.cell:nth-child(${BOARD_SIZE})::before{width:50%}
+.cell:first-child::before{left:50%}
+.stone{
+  width:28px;height:28px;
+  border-radius:50%;
+  position:relative;z-index:1;
+  box-shadow:1px 2px 4px rgba(0,0,0,.5)
 }
-.controls {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-}
-button.ctrl {
-  padding: 10px 14px;
-  border: none;
-  background: #333;
-  color: #fff;
-  border-radius: 8px;
-  cursor: pointer;
-}
-#status {
-  margin-bottom: 14px;
-  padding: 10px 12px;
-  background: #fff;
-  border-radius: 8px;
-  border: 1px solid #ddd;
-}
-#board {
-  display: grid;
-  grid-template-columns: repeat(${BOARD_SIZE}, 34px);
-  gap: 2px;
-  background: #b88b4a;
-  padding: 8px;
-  width: fit-content;
-  border-radius: 10px;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
-}
-.cell {
-  width: 34px;
-  height: 34px;
-  border: none;
-  background: #ddb66d;
-  font-size: 22px;
-  line-height: 34px;
-  text-align: center;
-  cursor: pointer;
-}
-.cell.black {
-  color: #111;
-}
-.cell.white {
-  color: #fafafa;
-  text-shadow: 0 0 1px #000;
-}
-.note {
-  margin-top: 14px;
-  color: #555;
-  font-size: 14px;
-}
+.stone.black{background:radial-gradient(circle at 35% 35%,#666,#111)}
+.stone.white{background:radial-gradient(circle at 35% 35%,#fff,#ccc)}
+.stone.last{box-shadow:0 0 0 2px #f0c87a,1px 2px 4px rgba(0,0,0,.5)}
+.note{margin-top:12px;color:#666;font-size:12px}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>仓颉五子棋（基础版）</h1>
+  <h1>仓颉五子棋</h1>
   <div class="controls">
-    <button class="ctrl" onclick="newGame('pvp')">本地双人</button>
-    <button class="ctrl" onclick="newGame('ai')">人机对战</button>
-    <button class="ctrl" onclick="refreshState()">刷新状态</button>
+    <button class="ctrl" id="btn-pvp"       onclick="newGame('pvp','greedy')">本地双人</button>
+    <button class="ctrl" id="btn-greedy"    onclick="newGame('ai','greedy')">人机·贪心</button>
+    <button class="ctrl" id="btn-minimax"   onclick="newGame('ai','minimax')">人机·Minimax</button>
+    <button class="ctrl" id="btn-alphabeta" onclick="newGame('ai','alphabeta')">人机·Alpha-Beta</button>
+    <button class="ctrl" id="btn-solver"    onclick="newGame('ai','solver')">人机·必胜</button>
   </div>
   <div id="status">加载中...</div>
-  <div id="board"></div>
-  <div class="note">
-    当前基础版：15x15 棋盘，本地双人 + 基础 AI，后端状态全部在仓颉服务端维护。
-  </div>
+  <div class="board-wrap"><div id="board"></div></div>
+  <div class="note">15×15，仓颉后端。难度：贪心 &lt; Minimax &lt; Alpha-Beta &lt; 必胜</div>
 </div>
 
 <script>
 const SIZE = ${BOARD_SIZE};
+let busy = false;
+let lastData = null;
 
-function stoneName(v) {
-  if (v === 1) return '黑子';
-  if (v === 2) return '白子';
-  return '无';
+function stoneName(v){return v===1?'黑子':v===2?'白子':'无'}
+
+function setLoading(on){
+  busy = on;
+  const b = document.getElementById('board');
+  const s = document.getElementById('status');
+  if(on){b.classList.add('locked');s.classList.add('loading')}
+  else{b.classList.remove('locked');s.classList.remove('loading')}
 }
 
-async function getJson(url) {
+async function getJson(url){
   const res = await fetch(url);
-  return await res.json();
+  return res.json();
 }
 
-async function newGame(mode) {
-  const data = await getJson('/api/new?mode=' + mode);
-  render(data);
+async function newGame(mode, diff){
+  if(busy) return;
+  setLoading(true);
+  try{
+    const data = await getJson('/api/new?mode='+mode+'&diff='+diff);
+    render(data);
+    highlightBtn(mode, diff);
+  }finally{setLoading(false)}
 }
 
-async function move(row, col) {
-  const data = await getJson('/api/move?row=' + row + '&col=' + col);
-  render(data);
+async function doMove(row, col){
+  if(busy) return;
+  setLoading(true);
+  try{
+    const data = await getJson('/api/move?row='+row+'&col='+col);
+    render(data);
+  }finally{setLoading(false)}
 }
 
-async function refreshState() {
-  const data = await getJson('/api/state');
-  render(data);
+function highlightBtn(mode, diff){
+  document.querySelectorAll('.ctrl').forEach(b=>b.classList.remove('active'));
+  const id = mode==='pvp'?'btn-pvp':'btn-'+diff;
+  const el = document.getElementById(id);
+  if(el) el.classList.add('active');
 }
 
-function render(data) {
-  const status = document.getElementById('status');
-  let text = '模式：' + (data.mode === 'ai' ? '人机对战' : '本地双人');
-
-  if (data.gameOver) {
-    if (data.winner === 0) {
-      text += ' ｜ 结果：平局';
-    } else {
-      text += ' ｜ 获胜：' + stoneName(data.winner);
-    }
-  } else {
-    text += ' ｜ 当前：' + stoneName(data.currentPlayer);
+function render(data){
+  lastData = data;
+  const diffName={greedy:'贪心',minimax:'Minimax',alphabeta:'Alpha-Beta',solver:'必胜'}[data.difficulty]||data.difficulty;
+  const s = document.getElementById('status');
+  s.classList.remove('loading');
+  let text = data.mode==='ai'?('人机对战·'+diffName):'本地双人';
+  if(data.gameOver){
+    text += data.winner===0?' ｜ 平局':' ｜ 获胜：'+stoneName(data.winner);
+  }else{
+    text += ' ｜ 当前：'+stoneName(data.currentPlayer);
+    if(data.mode==='ai'&&data.currentPlayer===2) text += '（AI 思考中…）';
   }
+  if(data.message) text += ' ｜ '+data.message;
+  s.textContent = text;
 
-  if (data.message) {
-    text += ' ｜ 提示：' + data.message;
-  }
-
-  status.textContent = text;
+  const canClick = !data.gameOver && !(data.mode==='ai' && data.currentPlayer===2);
 
   const board = document.getElementById('board');
-  board.innerHTML = '';
-
-  for (let r = 0; r < SIZE; r++) {
-    for (let c = 0; c < SIZE; c++) {
-      const cell = document.createElement('button');
-      cell.className = 'cell';
+  board.innerHTML='';
+  for(let r=0;r<SIZE;r++){
+    for(let c=0;c<SIZE;c++){
+      const cell = document.createElement('div');
+      cell.className='cell';
       const v = data.board[r][c];
-
-      if (v === 1) {
-        cell.textContent = '●';
-        cell.classList.add('black');
-      } else if (v === 2) {
-        cell.textContent = '○';
-        cell.classList.add('white');
-      } else {
-        cell.textContent = '';
+      if(v){
+        const stone=document.createElement('div');
+        stone.className='stone '+(v===1?'black':'white');
+        if(r===data.lastRow&&c===data.lastCol) stone.classList.add('last');
+        cell.appendChild(stone);
+      }else if(canClick){
+        cell.style.cursor='pointer';
+        cell.onclick=()=>doMove(r,c);
+      }else{
+        cell.style.cursor='default';
       }
-
-      cell.onclick = () => move(r, c);
       board.appendChild(cell);
     }
   }
 }
 
-refreshState();
+(async()=>{
+  try{
+    const data=await getJson('/api/state');
+    render(data);
+    highlightBtn(data.mode, data.difficulty);
+  }catch(e){
+    document.getElementById('status').textContent='请点击上方按钮开始游戏';
+  }
+})();
 </script>
 </body>
 </html>
@@ -617,13 +881,18 @@ func handleRequest(request: String): Array<Byte> {
     }
 
     if (path == "/api/state") {
-        return jsonResponse(game.stateJson(true, ""))
+        synchronized(gameMutex) {
+            return jsonResponse(game.stateJson(true, ""))
+        }
     }
 
     if (path == "/api/new") {
         let mode = queryValue(query, "mode")
-        game.reset(mode)
-        return jsonResponse(game.stateJson(true, "新对局已创建"))
+        let diff = queryValue(query, "diff")
+        synchronized(gameMutex) {
+            game.reset(mode, diff)
+            return jsonResponse(game.stateJson(true, "新对局已创建"))
+        }
     }
 
     if (path == "/api/move") {
@@ -631,11 +900,15 @@ func handleRequest(request: String): Array<Byte> {
         let col = parseIntOrMinusOne(queryValue(query, "col"))
 
         if (row < 0 || col < 0) {
-            return jsonResponse(game.stateJson(false, "参数错误"))
+            synchronized(gameMutex) {
+                return jsonResponse(game.stateJson(false, "参数错误"))
+            }
         }
 
-        let result = game.playerMove(row, col)
-        return jsonResponse(game.stateJson(result.ok, result.message))
+        synchronized(gameMutex) {
+            let result = game.playerMove(row, col)
+            return jsonResponse(game.stateJson(result.ok, result.message))
+        }
     }
 
     if (path == "/favicon.ico") {
@@ -652,15 +925,18 @@ func handleClient(client: TcpSocket) {
 }
 
 main(): Int64 {
-    game.reset("pvp")
+    game.reset("pvp", "greedy")
     println("Gomoku server started at http://127.0.0.1:${SERVER_PORT}/")
 
     try (server = TcpServerSocket(bindAt: SERVER_PORT)) {
         server.bind()
 
         while (true) {
-            try (client = server.accept()) {
-                handleClient(client)
+            let client = server.accept()
+            spawn {
+                try (c = client) {
+                    handleClient(c)
+                }
             }
         }
     }

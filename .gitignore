@@ -1,0 +1,18 @@
+# 仓颉构建产物
+target/
+.cache/
+
+# cjpm 缓存
+*.cjo
+
+# Playwright 测试产物
+.playwright-mcp/
+*.png
+
+# 编辑器
+.vscode/
+*.swp
+
+# 系统
+.DS_Store
+Thumbs.db

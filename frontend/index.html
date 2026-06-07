@@ -74,6 +74,13 @@
 
         <div class="diff-panel" id="lan-panel">
           <div class="diff-panel-inner">
+            <div class="lan-share-card">
+              <p class="lan-share-label">当前访问地址</p>
+              <code id="lan-origin-value" class="lan-origin-value">--</code>
+              <div class="lan-copy-actions">
+                <button class="lan-copy-btn" type="button" onclick="copyCurrentAddress()">复制地址</button>
+              </div>
+            </div>
             <button class="diff-btn" onclick="startLanHost()">
               <span class="diff-name">创建房间</span>
               <span class="diff-tag">房主执黑</span>
@@ -132,7 +139,7 @@
           <canvas id="board" width="560" height="560"></canvas>
           <div id="thinking-overlay" class="thinking-overlay hidden">
             <div class="spinner"></div>
-            <span>AI 正在计算落点</span>
+            <span id="thinking-text">AI 正在计算落点</span>
           </div>
         </div>
       </section>
@@ -143,6 +150,14 @@
           <div class="lan-room-head">
             <strong id="lan-room-id" class="lan-room-id">--</strong>
             <span id="lan-seat-label" class="lan-seat-label">--</span>
+          </div>
+          <div class="lan-room-share">
+            <p class="lan-share-label">邀请链接</p>
+            <code id="lan-share-link" class="lan-origin-value">--</code>
+            <div class="lan-copy-actions">
+              <button class="lan-copy-btn" type="button" onclick="copyRoomCode()">复制房间号</button>
+              <button class="lan-copy-btn" type="button" onclick="copyInviteLink()">复制邀请链接</button>
+            </div>
           </div>
           <p id="lan-room-note" class="lan-room-note">等待玩家加入。</p>
         </section>

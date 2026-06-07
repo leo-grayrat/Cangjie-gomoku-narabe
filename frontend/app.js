@@ -165,6 +165,8 @@ let lanSession = {
   pollTimer: null
 };
 
+const pageParams = new URLSearchParams(window.location.search);
+
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
 
@@ -207,6 +209,81 @@ function setLanHomeNote(message) {
   const note = document.getElementById('lan-home-note');
   if (!note) return;
   note.textContent = message || DEFAULT_LAN_HOME_NOTE;
+}
+
+function currentOrigin() {
+  return `${window.location.protocol}//${window.location.host}/`;
+}
+
+function isLoopbackHost() {
+  const host = window.location.hostname;
+  return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+}
+
+function currentRoomInviteLink(roomId) {
+  return `${window.location.origin}/?room=${encodeURIComponent(roomId)}`;
+}
+
+async function copyText(text, successMessage) {
+  try {
+    await navigator.clipboard.writeText(text);
+    setFlash(successMessage);
+    return true;
+  } catch (_error) {
+    setFlash('复制失败，请手动复制。');
+    return false;
+  }
+}
+
+function refreshLanHomeHint() {
+  const originEl = document.getElementById('lan-origin-value');
+  if (originEl) {
+    originEl.textContent = currentOrigin();
+  }
+
+  const joinedRoom = (pageParams.get('room') || '').trim();
+  if (joinedRoom) {
+    const input = document.getElementById('lan-room-input');
+    input.value = joinedRoom;
+    setLanPanel(true);
+    setLanHomeNote(`已识别邀请房间 ${joinedRoom}，点击“加入房间”即可进入。`);
+    return;
+  }
+
+  if (isLoopbackHost()) {
+    setLanHomeNote('你当前打开的是 localhost/127.0.0.1，这个地址只能本机访问。联机前请改用本机局域网 IP 打开本页，再把地址或邀请链接发给对方。');
+    return;
+  }
+
+  setLanHomeNote('');
+}
+
+function copyCurrentAddress() {
+  if (isLoopbackHost()) {
+    setLanHomeNote('当前地址是 localhost/127.0.0.1，复制后别的设备也打不开。请先改用局域网 IP 打开本页。');
+    return;
+  }
+  copyText(currentOrigin(), '当前地址已复制。');
+}
+
+function copyRoomCode() {
+  if (!lanSession.active || !lanSession.roomId) {
+    setFlash('当前没有可复制的房间号。');
+    return;
+  }
+  copyText(lanSession.roomId, '房间号已复制。');
+}
+
+function copyInviteLink() {
+  if (!lanSession.active || !lanSession.roomId) {
+    setFlash('当前没有可复制的邀请链接。');
+    return;
+  }
+  if (isLoopbackHost()) {
+    setFlash('当前页面地址仍是 localhost/127.0.0.1，邀请链接不能给其他设备使用。');
+    return;
+  }
+  copyText(currentRoomInviteLink(lanSession.roomId), '邀请链接已复制。');
 }
 
 function updateModeLabel(mode, diff) {
@@ -284,8 +361,8 @@ function goHome() {
   closeReview();
   hideLanRoomPanel();
   setFlash('', 0);
-  setLanHomeNote('');
   showView('view-home');
+  refreshLanHomeHint();
 }
 
 async function api(url) {
@@ -458,6 +535,7 @@ function updateLanRoomPanel(data) {
   const roomIdEl = document.getElementById('lan-room-id');
   const seatEl = document.getElementById('lan-seat-label');
   const noteEl = document.getElementById('lan-room-note');
+  const shareEl = document.getElementById('lan-share-link');
 
   if (!data || data.mode !== 'lan') {
     panel.classList.add('hidden');
@@ -466,6 +544,7 @@ function updateLanRoomPanel(data) {
 
   panel.classList.remove('hidden');
   roomIdEl.textContent = data.roomId || '--';
+  shareEl.textContent = data.roomId ? currentRoomInviteLink(data.roomId) : '--';
 
   if (lanSession.seat === 1) {
     seatEl.textContent = '房主 · 执黑';
@@ -802,8 +881,20 @@ function clearResultTimer() {
   }
 }
 
+function busyOverlayText() {
+  const mode = state ? state.mode : currentMode;
+  if (mode === 'ai') {
+    return 'AI 正在计算落点';
+  }
+  if (mode === 'lan') {
+    return '正在同步对局状态';
+  }
+  return '正在处理当前操作';
+}
+
 function setLoading(on) {
   busy = on;
+  document.getElementById('thinking-text').textContent = busyOverlayText();
   document.getElementById('thinking-overlay').classList.toggle('hidden', !on);
   updateButtons();
 }
@@ -1198,4 +1289,4 @@ drawBoardSurface(ctx);
 updateButtons();
 updatePredictionPanel(null);
 updateTriviaPanel(null);
-setLanHomeNote('');
+refreshLanHomeHint();

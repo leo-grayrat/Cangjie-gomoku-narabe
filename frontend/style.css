@@ -270,6 +270,64 @@ button:focus-visible {
   gap: var(--space-2);
 }
 
+.lan-share-card,
+.lan-room-share {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklab, var(--color-card) 74%, var(--color-paper) 26%);
+}
+
+.lan-share-label {
+  margin: 0;
+  color: var(--color-paper-dim);
+  font-size: var(--text-xs);
+}
+
+.lan-origin-value {
+  display: block;
+  padding: 0.7rem 0.8rem;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--color-night-2) 70%, transparent);
+  color: var(--color-paper);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  word-break: break-all;
+  white-space: normal;
+}
+
+.lan-copy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.lan-copy-btn {
+  appearance: none;
+  padding: 0.52rem 0.78rem;
+  border: 1px solid var(--color-card-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-paper-soft);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+}
+
+.lan-copy-btn:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--color-brass) 60%, transparent);
+  color: var(--color-paper);
+  background: color-mix(in oklab, var(--color-card) 60%, var(--color-paper) 40%);
+}
+
 .lan-room-input {
   width: 100%;
   padding: 0.92rem 1rem;

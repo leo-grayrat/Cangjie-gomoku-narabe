@@ -75,8 +75,7 @@ async function startGame(mode, diff) {
 
   document.getElementById('mode-label').textContent =
     mode === 'pvp' ? '本地双人' : (ALGO_NAMES[diff] || diff);
-  document.getElementById('algo-hint').textContent =
-    mode === 'pvp' ? '双人模式下双方轮流落子，帮助功能会为当前落子方给出建议。' : (ALGO_HINTS[diff] || '');
+  document.getElementById('algo-hint').textContent = '';
   showAlgoDetail(mode, diff);
 
   setLoading(true);

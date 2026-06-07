@@ -43,7 +43,10 @@
   <div class="game-header">
     <button class="back-btn" onclick="goHome()">返回首页</button>
     <span id="mode-label" class="mode-label"></span>
-    <span id="status-text" class="status-text"></span>
+    <div id="turn-indicator" class="turn-indicator">
+      <span id="turn-stone" class="turn-stone black"></span>
+      <span id="turn-text" class="turn-text">黑方回合</span>
+    </div>
   </div>
 
   <div class="board-container">
@@ -71,7 +74,6 @@
   </div>
 
   <p id="action-message" class="action-message"></p>
-  <p id="algo-hint" class="algo-hint hidden" aria-hidden="true"></p>
 
   <div class="algo-detail-section">
     <div class="algo-detail-block" data-diff="pvp">
@@ -87,7 +89,7 @@
     </div>
     <div class="algo-detail-block" data-diff="medium">
       <h3>Medium</h3>
-      <p>Medium 使用的是 Minimax 算法。它的做法是把当前每一个候选落点都继续往后展开，然后分别站在“我方会尽量下得最好、对方也会尽量反击得最好”这两个立场上，比较哪一条变化最后留下的局面最有利。</p>
+      <p>Medium 使用的是 Minimax 算法。它会把当前每一个候选落点都继续往后展开，并且默认双方都会尽力去下对自己最有利的那一手，然后比较这些变化最后分别会把局面带到哪里。</p>
       <p>因此，Minimax 的核心不是“只看当前这一手值不值”，而是比较不同落子在来回应对之后最终会导向怎样的局面。可以把它理解成一种“先想自己的下一手，再想对方会怎样反击，然后再比较哪条路整体更好”的方法。</p>
       <p>与贪心算法相比，Minimax 更强调成套的攻防关系，而不是单手得失。所以这一档已经会表现出比较明确的对招意识：它不只是补眼前的点，还会考虑这一步之后局面会如何继续展开。</p>
     </div>

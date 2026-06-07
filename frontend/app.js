@@ -6,14 +6,6 @@ const PAD = 22;
 const RADIUS = 14;
 const BOARD_PX = PAD * 2 + CELL * (SIZE - 1);
 
-const ALGO_HINTS = {
-  easy: 'Easy：防立即输棋，带少量随机扰动，适合刚上手的玩家。',
-  medium: 'Medium：Minimax 深度 3，能形成基本攻防，但仍有明显套路可抓。',
-  hard: 'Hard：Alpha-Beta 深度 4，搜索更稳，适合想认真对局时挑战。',
-  expert: 'Expert：在 Hard 基础上增加立即必胜/必防预检，残局更强。',
-  joseki: 'Joseki：前期优先走定式，走出定式后退化为 Hard 强度。'
-};
-
 const ALGO_NAMES = {
   easy: '人机 · Easy',
   medium: '人机 · Medium',
@@ -75,7 +67,6 @@ async function startGame(mode, diff) {
 
   document.getElementById('mode-label').textContent =
     mode === 'pvp' ? '本地双人' : (ALGO_NAMES[diff] || diff);
-  document.getElementById('algo-hint').textContent = '';
   showAlgoDetail(mode, diff);
 
   setLoading(true);
@@ -217,7 +208,7 @@ function applyState(data, options = {}) {
     clearResultTimer();
   }
 
-  updateStatus(data);
+  updateTurnIndicator(data);
   updateButtons();
   updateReviewUI();
 
@@ -264,10 +255,22 @@ function pushHistoryBoard(board) {
   }
 }
 
-function updateStatus(data) {
-  const el = document.getElementById('status-text');
+function updateTurnIndicator(data) {
+  const stone = document.getElementById('turn-stone');
+  const text = document.getElementById('turn-text');
+
+  stone.className = 'turn-stone';
   if (data.gameOver) {
-    el.textContent = data.winner === 0 ? '平局' : (data.winner === 1 ? '黑子获胜' : '白子获胜');
+    if (data.winner === 0) {
+      stone.classList.add('white');
+      text.textContent = '本局平局';
+    } else if (data.winner === 1) {
+      stone.classList.add('black');
+      text.textContent = '黑方胜出';
+    } else {
+      stone.classList.add('white');
+      text.textContent = '白方胜出';
+    }
     clearResultTimer();
     resultTimer = window.setTimeout(() => {
       if (state && state.gameOver && !reviewState.open) {
@@ -279,10 +282,17 @@ function updateStatus(data) {
 
   clearResultTimer();
   if (data.mode === 'ai' && data.currentPlayer === 2) {
-    el.textContent = 'AI 思考中';
+    stone.classList.add('white', 'ai');
+    text.textContent = 'AI 思考中';
+    return;
+  }
+
+  if (data.currentPlayer === 1) {
+    stone.classList.add('black');
+    text.textContent = '黑方回合';
   } else {
-    const player = data.currentPlayer === 1 ? '黑子' : '白子';
-    el.textContent = `当前轮到：${player}`;
+    stone.classList.add('white');
+    text.textContent = '白方回合';
   }
 }
 

@@ -29,7 +29,15 @@ func handleRequest(request: String): Array<Byte> {
     if (pair.size > 1) { query = pair[1] }
 
     if (path == "/") {
-        return htmlResponse(indexPage())
+        return serveFile("frontend/index.html", "text/html; charset=utf-8")
+    }
+
+    if (path == "/style.css") {
+        return serveFile("frontend/style.css", "text/css; charset=utf-8")
+    }
+
+    if (path == "/app.js") {
+        return serveFile("frontend/app.js", "application/javascript; charset=utf-8")
     }
 
     if (path == "/api/state") {

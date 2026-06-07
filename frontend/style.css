@@ -8,7 +8,6 @@
   --text: #e8e0d0;
   --muted: #8e8477;
   --accent: #d4a843;
-  --accent-soft: rgba(212, 168, 67, 0.16);
 }
 
 html, body {
@@ -224,10 +223,15 @@ html, body {
   to { transform: rotate(360deg); }
 }
 
-.action-bar {
+.action-bar,
+.review-actions {
   display: flex;
   justify-content: center;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.action-bar {
   margin: 18px auto 0;
   padding: 0 24px;
 }
@@ -254,6 +258,29 @@ html, body {
 .result-btn:disabled {
   opacity: .45;
   cursor: not-allowed;
+}
+
+.review-panel {
+  width: min(560px, calc(100vw - 32px));
+  margin: 16px auto 0;
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid #2e2e40;
+  text-align: center;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, .35);
+}
+
+.review-title {
+  color: var(--accent);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+
+.review-step {
+  margin: 6px 0 16px;
+  color: var(--muted);
 }
 
 .action-message {
@@ -299,8 +326,7 @@ html, body {
   line-height: 1.85;
 }
 
-.result-overlay,
-.review-overlay {
+.result-overlay {
   position: fixed;
   inset: 0;
   display: flex;
@@ -311,10 +337,7 @@ html, body {
   z-index: 100;
 }
 
-.review-overlay { z-index: 120; }
-
-.result-card,
-.review-card {
+.result-card {
   min-width: 300px;
   max-width: 90vw;
   padding: 36px 42px;
@@ -335,8 +358,7 @@ html, body {
 .result-icon.white { color: #f0ede8; text-shadow: 0 0 12px rgba(255, 255, 255, .35); }
 .result-icon.draw { color: var(--muted); }
 
-.result-title,
-.review-title {
+.result-title {
   color: var(--accent);
   font-size: 1.55rem;
   font-weight: 700;
@@ -348,37 +370,7 @@ html, body {
   color: var(--muted);
 }
 
-.review-step {
-  margin: 10px 0 26px;
-  color: var(--muted);
-}
-
-.review-overlay {
-  inset: auto 0 28px 0;
-  justify-content: center;
-  align-items: flex-end;
-  background: none;
-  backdrop-filter: none;
-  pointer-events: none;
-}
-
-.review-card {
-  width: min(560px, calc(100vw - 32px));
-  min-width: 0;
-  padding: 20px 24px;
-  pointer-events: auto;
-}
-
-.review-title {
-  font-size: 1.2rem;
-}
-
-.review-step {
-  margin: 6px 0 18px;
-}
-
-.result-actions,
-.review-actions {
+.result-actions {
   display: flex;
   gap: 12px;
   justify-content: center;
@@ -421,12 +413,12 @@ html, body {
     height: auto;
   }
 
-  .action-bar {
-    flex-wrap: wrap;
+  .result-card {
+    padding: 28px 22px;
   }
 
-  .result-card,
-  .review-card {
-    padding: 28px 22px;
+  .review-panel {
+    width: min(92vw, 560px);
+    padding: 16px 14px;
   }
 }

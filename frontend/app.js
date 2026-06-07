@@ -155,7 +155,7 @@ function openReview() {
   hideResult();
   reviewState.open = true;
   reviewState.index = moveHistory.length - 1;
-  document.getElementById('review-overlay').classList.remove('hidden');
+  document.getElementById('review-panel').classList.remove('hidden');
   updateReviewUI();
   updateButtons();
   startRaf();
@@ -165,7 +165,7 @@ function closeReview() {
   clearResultTimer();
   hideResult();
   reviewState.open = false;
-  document.getElementById('review-overlay').classList.add('hidden');
+  document.getElementById('review-panel').classList.add('hidden');
   updateButtons();
   startRaf();
 }
@@ -177,12 +177,6 @@ function stepReview(delta) {
   reviewState.index = next;
   updateReviewUI();
   startRaf();
-}
-
-function handleReviewOverlayClick(event) {
-  if (event.target === event.currentTarget) {
-    closeReview();
-  }
 }
 
 function applyState(data, options = {}) {

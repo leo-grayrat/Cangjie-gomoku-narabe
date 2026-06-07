@@ -59,8 +59,18 @@
     <button id="hint-btn" class="action-btn" onclick="handleHint()">帮助</button>
     <button id="review-btn" class="action-btn" onclick="openReview()">复盘</button>
   </div>
-  <p id="action-message" class="action-message"></p>
 
+  <div id="review-panel" class="review-panel hidden">
+    <div class="review-title">终局复盘</div>
+    <div id="review-step" class="review-step"></div>
+    <div class="review-actions">
+      <button id="review-prev-btn" class="result-btn" onclick="stepReview(-1)">上一步</button>
+      <button id="review-next-btn" class="result-btn" onclick="stepReview(1)">下一步</button>
+      <button class="result-btn primary" onclick="closeReview()">退出复盘</button>
+    </div>
+  </div>
+
+  <p id="action-message" class="action-message"></p>
   <p id="algo-hint" class="algo-hint"></p>
 
   <div class="algo-detail-section">
@@ -74,7 +84,7 @@
     </div>
     <div class="algo-detail-block" data-diff="medium">
       <h3>Medium</h3>
-      <p>使用无剪枝 Minimax 搜索，深度 3、候选点 10，能形成基本策略，但仍可被中级玩家针对。</p>
+      <p>使用无剪枝 Minimax 搜索，深度 3、候选点 10，能形成基本攻防，但仍可被中级玩家针对。</p>
     </div>
     <div class="algo-detail-block" data-diff="hard">
       <h3>Hard</h3>
@@ -87,18 +97,6 @@
     <div class="algo-detail-block" data-diff="joseki">
       <h3>Joseki</h3>
       <p>前期优先按定式落子，走出定式库后退化为 Hard 水平，适合观察开局套路。</p>
-    </div>
-  </div>
-
-  <div id="review-overlay" class="review-overlay hidden">
-    <div class="review-card">
-      <div class="review-title">终局复盘</div>
-      <div id="review-step" class="review-step"></div>
-      <div class="review-actions">
-        <button id="review-prev-btn" class="result-btn" onclick="stepReview(-1)">上一步</button>
-        <button id="review-next-btn" class="result-btn" onclick="stepReview(1)">下一步</button>
-        <button class="result-btn primary" onclick="closeReview()">退出复盘</button>
-      </div>
     </div>
   </div>
 

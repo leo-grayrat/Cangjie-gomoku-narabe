@@ -1,11 +1,10 @@
 'use strict';
 
 const SIZE = 15;
-const CELL = 36;       // px per cell
-const PAD  = 22;       // board padding
-const RADIUS = 14;     // stone radius
-
-const BOARD_PX = PAD * 2 + CELL * (SIZE - 1);  // = 560 with above values
+const CELL = 36;
+const PAD  = 22;
+const RADIUS = 14;
+const BOARD_PX = PAD * 2 + CELL * (SIZE - 1);
 
 const ALGO_HINTS = {
   easy:    '简单：防必输 + 70% 贪心启发 + 30% 随机邻近落子，会犯明显错误。',
@@ -22,10 +21,10 @@ const ALGO_NAMES = {
 
 let state = null;
 let busy  = false;
+let currentMode = 'ai', currentDiff = 'easy';
 
-// animation state
-let pulseFrames = [];   // [{row, col, t}]
-let dropFrames  = [];   // [{row, col, stone, t}] stone=1|2
+let pulseFrames = [];
+let dropFrames  = [];
 let rafId       = null;
 
 const canvas  = document.getElementById('board');
@@ -36,25 +35,38 @@ canvas.height = BOARD_PX;
 // ── Views ──────────────────────────────────────────────────────
 
 function showView(id) {
-  const views = document.querySelectorAll('.view');
-  views.forEach(v => { v.classList.remove('active', 'slide-in'); });
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active', 'slide-in'));
   const target = document.getElementById(id);
   target.classList.add('active', 'slide-in');
 }
 
-function goHome() { showView('view-home'); }
+function goHome() {
+  hideResult();
+  showView('view-home');
+}
+
+// ── Home interactions ──────────────────────────────────────────
+
+function toggleDiffPanel() {
+  const panel = document.getElementById('diff-panel');
+  const chevron = document.getElementById('diff-chevron');
+  chevron.classList.toggle('rotated', panel.classList.toggle('open'));
+}
 
 // ── Game lifecycle ─────────────────────────────────────────────
 
 async function startGame(mode, diff) {
   if (busy) return;
+  currentMode = mode;
+  currentDiff = diff;
   showView('view-game');
 
-  // set labels
   const label = mode === 'pvp' ? '本地双人' : (ALGO_NAMES[diff] || diff);
   document.getElementById('mode-label').textContent = label;
   document.getElementById('algo-hint').textContent =
     mode === 'pvp' ? '双人对弈模式：两位玩家轮流落子，先连五子者获胜。' : (ALGO_HINTS[diff] || '');
+
+  showAlgoDetail(mode, diff);
 
   setLoading(true);
   try {
@@ -63,6 +75,13 @@ async function startGame(mode, diff) {
   } finally {
     setLoading(false);
   }
+}
+
+function showAlgoDetail(mode, diff) {
+  document.querySelectorAll('.algo-detail-block').forEach(b => b.classList.remove('visible'));
+  const key = mode === 'pvp' ? 'pvp' : diff;
+  const block = document.querySelector(`.algo-detail-block[data-diff="${key}"]`);
+  if (block) block.classList.add('visible');
 }
 
 // ── API ────────────────────────────────────────────────────────
@@ -90,7 +109,6 @@ function applyState(data) {
   const prev = state;
   state = data;
 
-  // find newly placed stones → trigger drop animation
   dropFrames = [];
   if (prev) {
     for (let r = 0; r < SIZE; r++) {
@@ -102,7 +120,6 @@ function applyState(data) {
     }
   }
 
-  // pulse on last move
   pulseFrames = [];
   if (data.lastRow >= 0) {
     pulseFrames.push({ row: data.lastRow, col: data.lastCol, t: 0 });
@@ -115,16 +132,40 @@ function applyState(data) {
 function updateStatus(data) {
   const el = document.getElementById('status-text');
   if (data.gameOver) {
-    el.textContent = data.winner === 0 ? '平局' :
-      (data.winner === 1 ? '黑子获胜' : '白子获胜');
+    el.textContent = data.winner === 0 ? '平局' : (data.winner === 1 ? '黑子获胜' : '白子获胜');
+    setTimeout(() => showResult(data.winner), 400);
   } else {
     const player = data.currentPlayer === 1 ? '黑子' : '白子';
-    const waiting = data.mode === 'ai' && data.currentPlayer === 2;
-    el.textContent = waiting ? 'AI 思考中…' : `当前：${player}`;
+    el.textContent = (data.mode === 'ai' && data.currentPlayer === 2) ? 'AI 思考中…' : `当前：${player}`;
   }
 }
 
-// ── Loading / thinking overlay ─────────────────────────────────
+// ── Result overlay ─────────────────────────────────────────────
+
+function showResult(winner) {
+  const overlay = document.getElementById('result-overlay');
+  const icon    = document.getElementById('result-icon');
+  const title   = document.getElementById('result-title');
+  const sub     = document.getElementById('result-sub');
+
+  if (winner === 0) {
+    icon.className = 'result-icon draw'; icon.textContent = '◈';
+    title.textContent = '平局'; sub.textContent = '势均力敌，再分高下！';
+  } else {
+    icon.className = `result-icon ${winner === 1 ? 'black' : 'white'}`; icon.textContent = '●';
+    title.textContent = winner === 1 ? '黑子获胜' : '白子获胜'; sub.textContent = '五子连珠！';
+  }
+
+  overlay.classList.remove('hidden');
+  const card = overlay.querySelector('.result-card');
+  card.style.animation = 'none'; void card.offsetWidth; card.style.animation = '';
+}
+
+function hideResult() { document.getElementById('result-overlay').classList.add('hidden'); }
+function handleOverlayClick(e) { if (e.target === e.currentTarget) hideResult(); }
+function restartGame() { hideResult(); startGame(currentMode, currentDiff); }
+
+// ── Loading ────────────────────────────────────────────────────
 
 function setLoading(on) {
   busy = on;
@@ -141,68 +182,50 @@ function drawBoard() {
   ctx.fillStyle = '#c19a49';
   ctx.fillRect(0, 0, BOARD_PX, BOARD_PX);
 
-  // grid lines
   ctx.strokeStyle = '#9a7530';
   ctx.lineWidth = 1;
   for (let i = 0; i < SIZE; i++) {
-    ctx.beginPath();
-    ctx.moveTo(cx(0), cy(i)); ctx.lineTo(cx(SIZE-1), cy(i));
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(cx(i), cy(0)); ctx.lineTo(cx(i), cy(SIZE-1));
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx(0), cy(i)); ctx.lineTo(cx(SIZE-1), cy(i)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx(i), cy(0)); ctx.lineTo(cx(i), cy(SIZE-1)); ctx.stroke();
   }
 
-  // star points
   const stars = [[3,3],[3,11],[7,7],[11,3],[11,11]];
   ctx.fillStyle = '#7a5c20';
   stars.forEach(([r,c]) => {
-    ctx.beginPath();
-    ctx.arc(cx(c), cy(r), 3, 0, Math.PI*2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(cx(c), cy(r), 3, 0, Math.PI*2); ctx.fill();
   });
 }
 
 function drawStone(row, col, stone, scale) {
   const x = cx(col), y = cy(row);
-  const r = RADIUS * scale;
-
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(scale, scale);
-
   const grad = ctx.createRadialGradient(-RADIUS*0.3, -RADIUS*0.3, 1, 0, 0, RADIUS);
-  if (stone === 1) {
-    grad.addColorStop(0, '#555');
-    grad.addColorStop(1, '#111');
-  } else {
-    grad.addColorStop(0, '#fff');
-    grad.addColorStop(1, '#d0ccc8');
-  }
-
-  ctx.beginPath();
-  ctx.arc(0, 0, RADIUS, 0, Math.PI*2);
+  if (stone === 1) { grad.addColorStop(0, '#555'); grad.addColorStop(1, '#111'); }
+  else             { grad.addColorStop(0, '#fff'); grad.addColorStop(1, '#d0ccc8'); }
+  ctx.beginPath(); ctx.arc(0, 0, RADIUS, 0, Math.PI*2);
   ctx.fillStyle = grad;
-  ctx.shadowColor = 'rgba(0,0,0,.4)';
-  ctx.shadowBlur = 6;
-  ctx.shadowOffsetY = 2;
+  ctx.shadowColor = 'rgba(0,0,0,.4)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
   ctx.fill();
   ctx.restore();
 }
 
+function drawLastMark(row, col) {
+  const x = cx(col), y = cy(row), s = 6;
+  ctx.fillStyle = 'rgba(212,168,67,0.85)';
+  ctx.fillRect(x - s/2, y - s/2, s, s);
+}
+
 function drawPulse(row, col, t) {
-  // t in [0,1]: expanding ring fading out
   const x = cx(col), y = cy(row);
   const r = RADIUS + t * 14;
   const alpha = (1 - t) * 0.6;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI*2);
-  ctx.strokeStyle = `rgba(212,168,67,${alpha})`;
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2);
+  ctx.strokeStyle = `rgba(212,168,67,${alpha})`; ctx.lineWidth = 2; ctx.stroke();
 }
 
-function render(ts) {
+function render() {
   rafId = null;
   ctx.clearRect(0, 0, BOARD_PX, BOARD_PX);
   drawBoard();
@@ -210,10 +233,9 @@ function render(ts) {
   if (!state) return;
 
   const DT = 1/60;
-  const DROP_DUR = 0.18;  // seconds
+  const DROP_DUR = 0.18;
   const PULSE_DUR = 1.2;
 
-  // draw static stones (skip those being animated)
   const animating = new Set(dropFrames.map(f => `${f.row},${f.col}`));
   for (let r = 0; r < SIZE; r++) {
     for (let c = 0; c < SIZE; c++) {
@@ -223,26 +245,23 @@ function render(ts) {
     }
   }
 
-  // drop animations
+  if (state.lastRow >= 0 && dropFrames.length === 0) drawLastMark(state.lastRow, state.lastCol);
+
   dropFrames = dropFrames.filter(f => {
     f.t += DT / DROP_DUR;
     const t = Math.min(f.t, 1);
-    // easeOutBack
     const scale = 1 + (t-1)*(t-1)*((1.7+1)*(t-1)+1.7);
     drawStone(f.row, f.col, f.stone, Math.max(0.01, scale));
     return f.t < 1;
   });
 
-  // pulse
   pulseFrames = pulseFrames.filter(f => {
     f.t += DT / PULSE_DUR;
-    const t = f.t % 1;
-    drawPulse(f.row, f.col, t);
-    return true; // continuous
+    drawPulse(f.row, f.col, f.t % 1);
+    return true;
   });
 
-  const needMore = dropFrames.length > 0 || pulseFrames.length > 0;
-  if (needMore) {
+  if (dropFrames.length > 0 || pulseFrames.length > 0) {
     rafId = requestAnimationFrame(render);
   }
 }
@@ -271,7 +290,4 @@ canvas.addEventListener('click', e => {
   doMove(row, col);
 });
 
-// ── Initial render ─────────────────────────────────────────────
-
-// Draw empty board on load
 drawBoard();

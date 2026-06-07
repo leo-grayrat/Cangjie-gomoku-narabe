@@ -14,12 +14,12 @@
       <p class="serial-mark">五子棋对局与算法说明</p>
       <h1 class="home-title">仓颉五子棋</h1>
       <p class="home-lead">
-        这是一个支持本地对弈、人机对战和算法说明查看的五子棋页面。
+        这是一个支持本地双人、人机对战和局域网联机的五子棋页面。
       </p>
       <div class="home-copy">
         <p>
-          这里提供本地双人模式，以及五档人机难度：Easy、Medium、Hard、Expert 和 Joseki。
-          不同难度采用不同的算法思路，适合用来比较各种常见决策方法在五子棋中的表现。
+          页面提供本地双人模式，以及五档人机难度：Easy、Medium、Hard、Expert 和 Joseki。
+          进入对局后，棋盘下方会显示当前模式对应的算法说明。
         </p>
       </div>
     </section>
@@ -37,7 +37,7 @@
 
         <button class="mode-btn" onclick="toggleDiffPanel()">
           <span class="mode-name">人机对战</span>
-          <span class="mode-desc">先选择算法难度，再与 AI 对局。</span>
+          <span class="mode-desc">先选择难度，再与 AI 对局。</span>
           <span class="chevron" id="diff-chevron">›</span>
         </button>
 
@@ -63,6 +63,37 @@
               <span class="diff-name">Joseki</span>
               <span class="diff-tag">开局定式</span>
             </button>
+          </div>
+        </div>
+
+        <button class="mode-btn" onclick="toggleLanPanel()">
+          <span class="mode-name">局域网联机</span>
+          <span class="mode-desc">创建房间或输入房间号，和同一局域网内的玩家对局。</span>
+          <span class="chevron" id="lan-chevron">›</span>
+        </button>
+
+        <div class="diff-panel" id="lan-panel">
+          <div class="diff-panel-inner">
+            <button class="diff-btn" onclick="startLanHost()">
+              <span class="diff-name">创建房间</span>
+              <span class="diff-tag">房主执黑</span>
+            </button>
+            <div class="lan-join-row">
+              <input
+                id="lan-room-input"
+                class="lan-room-input"
+                type="text"
+                maxlength="12"
+                placeholder="输入房间号"
+              />
+              <button class="diff-btn lan-join-btn" onclick="joinLanRoom()">
+                <span class="diff-name">加入房间</span>
+                <span class="diff-tag">客方执白</span>
+              </button>
+            </div>
+            <p id="lan-home-note" class="lan-home-note">
+              联机双方需要访问同一台服务器地址，例如同一局域网内的 http://主机IP:8080/。
+            </p>
           </div>
         </div>
       </div>
@@ -107,6 +138,15 @@
       </section>
 
       <aside class="control-column">
+        <section id="lan-room-panel" class="insight-card hidden">
+          <p class="card-kicker">联机房间</p>
+          <div class="lan-room-head">
+            <strong id="lan-room-id" class="lan-room-id">--</strong>
+            <span id="lan-seat-label" class="lan-seat-label">--</span>
+          </div>
+          <p id="lan-room-note" class="lan-room-note">等待玩家加入。</p>
+        </section>
+
         <div class="action-bar">
           <button id="undo-btn" class="action-btn" onclick="handleUndo()">悔棋</button>
           <button id="hint-btn" class="action-btn" onclick="handleHint()">帮助</button>
@@ -166,7 +206,7 @@
           <section id="trivia-panel" class="insight-card trivia-panel">
             <p class="card-kicker">趣闻</p>
             <h3 id="trivia-title" class="trivia-title">等待对局开始</h3>
-            <p id="trivia-text" class="trivia-text">进入一局后，这里会显示一条和当前模式相关的小知识。</p>
+            <p id="trivia-text" class="trivia-text">进入对局后，这里会显示一条和五子棋相关的小知识。</p>
           </section>
         </div>
       </aside>
@@ -181,75 +221,73 @@
       <div class="algo-detail-block" data-diff="pvp">
         <h3>本地双人</h3>
         <p>
-          本地双人模式不包含 AI 决策。系统只负责棋盘状态管理、落子合法性检查、胜负判断，以及悔棋和复盘功能。
+          本地双人模式不包含 AI 决策。系统只负责棋盘状态管理、合法落子检查、胜负判断，以及悔棋和复盘功能。
         </p>
         <p>
-          这一模式适合把注意力完全放在规则本身。双方共用同一张棋盘，轮流落子，先在横、竖或斜向连成五子的一方获胜。
+          双方共用同一张棋盘，轮流落子，先在横、竖或斜方向连成五子的玩家获胜。
+        </p>
+      </div>
+
+      <div class="algo-detail-block" data-diff="lan">
+        <h3>局域网联机</h3>
+        <p>
+          局域网联机模式会把同一房间中的棋盘状态同步给两位玩家。房主创建房间后执黑，客方输入房间号加入后执白。
+        </p>
+        <p>
+          这个模式不包含 AI 决策，也不提供悔棋和帮助。所有落子都写回同一个房间状态，并通过轮询保持双方看到的是同一盘棋。
+        </p>
+        <p>
+          终局后仍然可以复盘；如果想继续下一局，由房主在当前房间内重新开始即可。
         </p>
       </div>
 
       <div class="algo-detail-block" data-diff="easy">
         <h3>Easy</h3>
         <p>
-          Easy 使用贪心策略。贪心的特点是优先选择当前看起来最有利的一步，而不把后续很多回合都完整展开比较。
+          Easy 使用贪心策略。贪心算法会优先选择当前最有利的一步，而不是把后续很多回合全部展开比较。
         </p>
         <p>
-          在五子棋里，这种策略通常会先检查有没有一步取胜点，或者有没有必须立刻补掉的威胁。处理完这些最直接的情况以后，它会选择当前收益较高的位置，例如更容易连子或更适合阻挡对方的位置。
-        </p>
-        <p>
-          这一档反应快，判断也比较直观，但它更擅长处理眼前局面。遇到需要连续铺垫的攻防时，整体稳定性会弱一些。
+          在五子棋里，它会先检查有没有一步取胜点，或有没有必须立刻补掉的威胁。处理完这些最直接的情况后，再选择当前收益较高的位置。
         </p>
       </div>
 
       <div class="algo-detail-block" data-diff="medium">
         <h3>Medium</h3>
         <p>
-          Medium 使用 Minimax。Minimax 会把当前局面下的若干候选走法继续展开，并假设双方都会选择对自己最有利的应对。
+          Medium 使用 Minimax。Minimax 会把当前局面的候选走法继续展开，并假设双方都会选择对自己最有利的应对。
         </p>
         <p>
-          这个算法的核心是比较“如果我走这一步，接下来对手会怎样回应；在这一来一回之后，局面最终会变成什么样”。它不是只看单手得失，而是通过双方轮流择优，比较不同路线的结果。
-        </p>
-        <p>
-          在实际对局里，这一档已经具备比较明确的对招意识。它会考虑自己的选择会引出什么反应，因此比单纯贪心更重视局面的连续变化。
+          它关心的是“如果我走这一步，对手会怎样回应；在双方都不犯明显错误的前提下，这条路线最后会把局面带到哪里”。
         </p>
       </div>
 
       <div class="algo-detail-block" data-diff="hard">
         <h3>Hard</h3>
         <p>
-          Hard 仍然沿用 Minimax 的基本框架，但在搜索过程中加入 Alpha-Beta 剪枝。Alpha-Beta 不是另一种完全不同的博弈思想，而是对 Minimax 的加速方法。
+          Hard 仍然基于 Minimax，但在搜索过程中加入 Alpha-Beta 剪枝。Alpha-Beta 不是另一套完全不同的算法，而是 Minimax 的加速方法。
         </p>
         <p>
-          它的做法是，在分析过程中尽早排除那些已经可以判断为不优的变化。这样可以减少不必要的分支，把计算集中到更关键的路线中。
-        </p>
-        <p>
-          放到五子棋里，这种方法通常会让判断更加稳定。它仍然是在比较双方来回应对后的局面，但能更有效地把注意力放在真正影响胜负的变化上。
+          它会尽早排除已经可以判断为不优的变化，把计算集中到更关键的路线，因此通常能得到更稳定的局面判断。
         </p>
       </div>
 
       <div class="algo-detail-block" data-diff="expert">
         <h3>Expert</h3>
         <p>
-          Expert 在整体判断之前，会先检查一步胜负和紧急威胁。也就是说，它先看棋盘上是否已经存在立即取胜的落点，或者是否出现了必须马上补防的位置。
+          Expert 会先检查一步胜负和紧急威胁，再进入更完整的局面判断。也就是说，它会先找当前是否已经存在立刻取胜或必须补防的位置。
         </p>
         <p>
-          这一层处理属于战术预检。五子棋中有些局面胜负已经压缩到一两手之内，这时先处理这些关键点，往往比直接进入一般搜索更合适。
-        </p>
-        <p>
-          在完成这一步以后，它再继续做更完整的局面判断。因此这一档在对杀、冲四、补断等局面里通常更果断，也更不容易漏掉直接威胁。
+          这种先处理关键战术点、再做整体比较的方式，在冲四、补断和对杀局面里通常更果断。
         </p>
       </div>
 
       <div class="algo-detail-block" data-diff="joseki">
         <h3>Joseki</h3>
         <p>
-          Joseki 的特点主要体现在开局。定式可以理解为一些常见开局形状下，经过长期总结后形成的典型应对方式。
+          Joseki 的特点主要体现在开局。定式可以理解为一些常见开局形状下，经过长期总结形成的典型应对方式。
         </p>
         <p>
-          如果程序识别到当前局面属于这些已知开局结构，就会优先按照定式知识落子。这样做的重点不在于临场把每一步都重新计算一遍，而在于先利用现成的开局经验。
-        </p>
-        <p>
-          需要注意的是，定式只负责开局阶段的已知范围，并不包办整盘棋。只要局面偏离这些结构，程序就会退出定式部分，回到常规判断方式。
+          如果程序识别到当前局面属于这些已知开局结构，就会优先按照定式知识落子；一旦走出这些结构，再回到常规判断方式。
         </p>
       </div>
     </section>

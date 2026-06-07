@@ -26,7 +26,7 @@ class GameState {
         this.moveCount = 0
         this.lastRow = -1
         this.lastCol = -1
-        this.mode = if (newMode == "ai") { "ai" } else { "pvp" }
+        this.mode = if (newMode == "ai") { "ai" } else if (newMode == "lan") { "lan" } else { "pvp" }
         this.difficulty = newDiff
         this.histCount = 0
     }
@@ -713,6 +713,13 @@ class GameState {
         }
 
         return ApiResult(true, "move_ok")
+    }
+
+    func playerMoveAs(player: Int64, row: Int64, col: Int64): ApiResult {
+        if (this.mode == "lan" && this.currentPlayer != player) {
+            return ApiResult(false, "not_your_turn")
+        }
+        return this.playerMove(row, col)
     }
 
     // --- Serialization ---

@@ -265,6 +265,35 @@ button:focus-visible {
   padding-top: var(--space-4);
 }
 
+.lan-join-row {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.lan-room-input {
+  width: 100%;
+  padding: 0.92rem 1rem;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklab, var(--color-card) 82%, var(--color-paper) 18%);
+  color: var(--color-paper);
+}
+
+.lan-room-input::placeholder {
+  color: var(--color-paper-dim);
+}
+
+.lan-join-btn {
+  margin-top: 0;
+}
+
+.lan-home-note {
+  margin: var(--space-2) 0 0;
+  color: var(--color-paper-dim);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
 .diff-btn {
   display: flex;
   align-items: center;
@@ -488,6 +517,35 @@ button:focus-visible {
 .sidebar-insights {
   display: grid;
   gap: var(--space-4);
+}
+
+.lan-room-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  align-items: center;
+  margin-top: var(--space-2);
+}
+
+.lan-room-id {
+  color: var(--color-paper);
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  letter-spacing: 0.08em;
+}
+
+.lan-seat-label {
+  padding: 0.18rem 0.62rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-brass) 16%, transparent);
+  color: var(--color-brass);
+  font-size: var(--text-xs);
+}
+
+.lan-room-note {
+  margin: var(--space-3) 0 0;
+  color: var(--color-paper-soft);
+  font-size: var(--text-sm);
 }
 
 .insight-card,

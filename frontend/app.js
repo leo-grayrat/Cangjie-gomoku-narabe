@@ -6,41 +6,7 @@ const PAD = 22;
 const RADIUS = 14;
 const BOARD_PX = PAD * 2 + CELL * (SIZE - 1);
 
-const MODE_TEXT = {
-  pvp: '本地双人',
-  easy: '人机对战 · Easy',
-  medium: '人机对战 · Medium',
-  hard: '人机对战 · Hard',
-  expert: '人机对战 · Expert',
-  joseki: '人机对战 · Joseki'
-};
-
-const TRIVIA_BY_KEY = {
-  pvp: {
-    title: '双人对局',
-    text: '标准五子棋的目标是在横、竖或斜向先连成五子。没有 AI 参与时，这一局只检验双方对局面的判断。'
-  },
-  easy: {
-    title: '贪心策略',
-    text: '贪心算法会优先处理眼前最直接的得失。它不一定看得远，但通常会先去抓住当前最划算的一手。'
-  },
-  medium: {
-    title: 'Minimax',
-    text: 'Minimax 假设双方都会选择对自己最有利的下法，因此擅长比较一来一回之后，局面最终会走向哪里。'
-  },
-  hard: {
-    title: 'Alpha-Beta',
-    text: 'Alpha-Beta 不是另一套新规则，而是 Minimax 的剪枝加速方式，用来更早排除明显不优的分支。'
-  },
-  expert: {
-    title: '战术预检',
-    text: '很多五子棋胜负并不需要长算，只要先抓住一步取胜点或必须补防的位置，判断就会立刻清楚很多。'
-  },
-  joseki: {
-    title: '开局定式',
-    text: '定式的价值主要体现在开局。它记录的是一些常见结构下较成熟的应对方式，而不是整盘棋的完整答案。'
-  }
-};
+const DEFAULT_LAN_HOME_NOTE = '联机双方需要访问同一台服务器地址，例如同一局域网内的 http://主机IP:8080/。';
 
 const DISPLAY_MODE_TEXT = {
   pvp: '本地双人',
@@ -48,180 +14,133 @@ const DISPLAY_MODE_TEXT = {
   medium: '人机对战 · Medium',
   hard: '人机对战 · Hard',
   expert: '人机对战 · Expert',
-  joseki: '人机对战 · Joseki'
+  joseki: '人机对战 · Joseki',
+  lan: '局域网联机'
+};
+
+const FRIENDLY_MESSAGES = {
+  new_game_created: '新对局已开始。',
+  no_undo: '当前没有可悔棋的步骤。',
+  undo_ok: '已悔棋。',
+  game_over_review: '对局已结束，请通过复盘查看。',
+  game_over: '对局已经结束，请重新开始。',
+  out_of_range: '坐标越界。',
+  occupied: '该位置已有棋子。',
+  wait_ai: '请等待 AI 落子。',
+  game_over_hint: '对局已结束，无法提供帮助。',
+  not_human_turn: '当前不是你的落子回合。',
+  bad_params: '参数错误。',
+  room_limit_reached: '当前联机房间已满，请稍后再试。',
+  room_not_found: '未找到该房间，请检查房间号。',
+  room_full: '该房间已经满员。',
+  room_created: '房间已创建，等待对手加入。',
+  room_joined: '已加入房间。',
+  wait_opponent: '房间还未满员，暂时不能开始。',
+  bad_player: '玩家身份无效，请重新加入房间。',
+  not_your_turn: '还没轮到你落子。',
+  host_only_reset: '只有房主可以重新开始本房间。',
+  room_reset: '房间已重开。',
+  room_closed: '房间已关闭。',
+  guest_left: '白方已离开房间。'
 };
 
 const TRIVIA_FACTS_BY_KEY = {
   pvp: [
     {
-      title: '棋盘规格',
-      text: '现代五子棋通常用 15×15 棋盘进行对局，19×19 棋盘在更早的时期也很常见。',
-      source: 'https://en.wikipedia.org/wiki/Gomoku'
-    },
-    {
-      title: '纸笔也能玩',
-      text: '因为棋子落下后通常不会移动或拿走，五子棋也常被当作纸笔游戏来玩。',
-      source: 'https://en.wikipedia.org/wiki/Gomoku'
-    },
-    {
-      title: '基本胜负',
-      text: '标准规则下，双方轮流落子，先在横、竖或斜方向连成五子的一方获胜。',
-      source: 'https://en.wikipedia.org/wiki/Gomoku'
-    },
-    {
-      title: '长连规则',
-      text: '有些规则要求必须正好五连，六子以上的长连不算胜利，这种情况叫作“长连”。',
-      source: 'https://en.wikipedia.org/wiki/Gomoku'
-    },
-    {
       title: '先手优势',
-      text: '黑棋先行，这也是五子棋长期存在先手优势讨论的根源之一。',
-      source: 'https://en.wikipedia.org/wiki/Gomoku'
+      text: '五子棋长期存在先手优势讨论，这也是后来衍生出交换规则和职业开局规则的重要原因。'
+    },
+    {
+      title: '纸笔游戏',
+      text: '因为棋子落下后通常不会移动，五子棋也常被当作纸笔游戏来玩。'
+    },
+    {
+      title: '基本目标',
+      text: '标准规则下，先在横、竖或斜方向连成五子的玩家获胜。'
     }
   ],
   easy: [
     {
-      title: '换手规则',
-      text: '在中国常见的一类规则里，黑棋第一手落下后，白棋可以直接选择是否交换黑白，以减轻先手优势。',
-      source: 'https://en.wikipedia.org/wiki/Gomoku'
+      title: '贪心思路',
+      text: '贪心算法会优先抓住当前最直接的收益，因此反应快，但不一定看得很远。'
     },
     {
-      title: '趣味变体',
-      text: 'Ninuki-Renju 会加入“吃子”规则：夹住对方连续两子时，可以把这一对棋子提走。',
-      source: 'https://en.wikipedia.org/wiki/Gomoku'
+      title: '局部判断',
+      text: '在棋类问题里，贪心常用于先处理眼前威胁，再选一个此刻最划算的位置。'
     },
     {
-      title: 'Pente 亲戚',
-      text: 'Pente 和 Ninuki-Renju 都带有吃子机制，但 Pente 常用 19×19 棋盘，也不采用黑方禁手。',
-      source: 'https://en.wikipedia.org/wiki/Gomoku'
-    },
-    {
-      title: '韩式变体',
-      text: 'Omok 和自由五子棋很接近，但常在 19×19 棋盘上进行，还会加入“三三禁手”。',
-      source: 'https://en.wikipedia.org/wiki/Gomoku'
-    },
-    {
-      title: '越南变体',
-      text: 'Caro 规则要求胜利线不能同时被两端堵死，因此防守方式和普通五子棋会有明显差别。',
-      source: 'https://en.wikipedia.org/wiki/Gomoku'
+      title: '开局中心',
+      text: '很多五子棋程序喜欢先从中心附近起手，因为这里向四个方向发展的空间最均衡。'
     }
   ],
   medium: [
     {
-      title: '组合博弈',
-      text: '从理论上看，五子棋属于 m,n,k 一类的连线游戏：在 m×n 棋盘上，先连成 k 子的一方获胜。',
-      source: 'https://en.wikipedia.org/wiki/Gomoku'
+      title: 'Minimax',
+      text: 'Minimax 的核心是假设双方都会尽量为自己争取最好的结果，再比较不同路线的最终局面。'
     },
     {
-      title: '先手必胜',
-      text: '1994 年，Victor Allis 证明了在空的 15×15 棋盘上、没有额外开局限制时，先手一方存在必胜策略。',
-      source: 'https://en.wikipedia.org/wiki/Gomoku'
+      title: '经典研究',
+      text: '五子棋是早期棋类 AI 研究中经常出现的题材，因为规则清晰，攻防又很鲜明。'
     },
     {
-      title: '问题还没结束',
-      text: '虽然无禁自由五子棋已有经典结论，但职业比赛常用的 Swap2 开局规则至今仍未被完全求解。',
-      source: 'https://en.wikipedia.org/wiki/Gomoku'
-    },
-    {
-      title: '早期棋类 AI',
-      text: '1962 年，Joseph Weizenbaum 就写过一篇文章，介绍如何让计算机下五子棋并击败初学者。',
-      source: 'https://en.wikipedia.org/wiki/Gomoku'
-    },
-    {
-      title: '复杂度很高',
-      text: '广义五子棋与计算复杂性研究关系很深，相关问题后来被证明属于 PSPACE-complete。',
-      source: 'https://en.wikipedia.org/wiki/Gomoku'
+      title: '连续应对',
+      text: '比起只看一步得失，Minimax 更在意“这一步之后，对手会怎么回应”。'
     }
   ],
   hard: [
     {
-      title: '职业开局',
-      text: '职业五子棋比赛会用专门的开局规则来平衡先手优势，世界锦标赛自 2009 年起使用 Swap2。',
-      source: 'https://en.wikipedia.org/wiki/Gomoku'
+      title: '剪枝思想',
+      text: 'Alpha-Beta 剪枝会尽早舍弃已经不可能成为最优答案的变化，从而把计算留给更关键的分支。'
     },
     {
-      title: 'Gomocup',
-      text: 'Gomocup 是面向五子棋 AI 的年度赛事，从 2000 年开始每年举行一次。',
-      source: 'https://gomocup.org/'
+      title: '搜索加速',
+      text: '它仍然建立在 Minimax 的对抗假设上，只是把一部分无效计算提前省掉了。'
     },
     {
-      title: 'AI 与人类',
-      text: '在 2017 年的公开对抗中，程序 Yixin 以 2 比 0 击败了当时的人类世界冠军。',
-      source: 'https://en.wikipedia.org/wiki/Gomoku'
-    },
-    {
-      title: '比赛分组',
-      text: '现在的 Gomocup 不只比一种规则，常见分组包括 freestyle、standard、renju 和 caro。',
-      source: 'https://gomocup.org/results/gomocup-result-2025/'
-    },
-    {
-      title: '电脑赛事很早',
-      text: 'Computer Olympiad 在 1989 年就收录过五子棋项目，之后又有专门的 Renju 电脑世界赛。',
-      source: 'https://en.wikipedia.org/wiki/Gomoku'
+      title: '比赛程序',
+      text: '很多棋类程序都会把剪枝作为基础技巧，因为它几乎不改变判断逻辑，却能显著提升效率。'
     }
   ],
   expert: [
     {
-      title: '连珠这个名字',
-      text: '“连珠”这个名称由日本记者黑岩泪香于 1899 年正式提出，原意是“连起来的珍珠”。',
-      source: 'https://en.wikipedia.org/wiki/Renju'
+      title: '战术优先',
+      text: '在五子棋里，一步取胜点和必须补防点往往比一般位置更重要，因此很多强程序都会先做这层检查。'
     },
     {
-      title: '职业分支',
-      text: '连珠可以看作五子棋的职业化分支，它保留了五子连线目标，但额外加入了平衡先手的规则。',
-      source: 'https://en.wikipedia.org/wiki/Renju'
+      title: '对杀判断',
+      text: '冲四、活三和补断一类局面变化很快，先抓住关键威胁通常比平均搜索更有效。'
     },
     {
-      title: '三类黑方禁手',
-      text: '连珠里黑方不能下出双三、双四和长连，这三类限制统称为黑方禁手。',
-      source: 'https://en.wikipedia.org/wiki/Renju'
-    },
-    {
-      title: '黑白胜法不同',
-      text: '连珠中黑方必须正好五连才能获胜，白方则可以用五连以上或逼出黑方禁手来赢棋。',
-      source: 'https://en.wikipedia.org/wiki/Renju'
-    },
-    {
-      title: '允许停一手',
-      text: '连珠规则允许“停着”，如果双方连续停着，整局会判作和棋。',
-      source: 'https://en.wikipedia.org/wiki/Renju'
+      title: '强制应手',
+      text: '当一方已经形成连续威胁时，对手往往只剩极少数可走位置，这类局面很适合先做战术预检。'
     }
   ],
   joseki: [
     {
-      title: '开局长度',
-      text: 'RIF 对连珠开局规则的要求之一，是开局阶段不要超过 5 手。',
-      source: 'https://en.wikipedia.org/wiki/Renju'
+      title: '定式',
+      text: '定式记录的是常见开局结构中的成熟应对方式，它解决的是开局知识，不是整盘棋的全部答案。'
     },
     {
-      title: '二十六开局',
-      text: '连珠理论里有 26 个规范开局，这也是很多开局研究和命名系统的基础。',
-      source: 'https://gomoku.renju.net/openings/'
+      title: '开局研究',
+      text: '五子棋和连珠都有系统化的开局研究，许多开局结构还有固定名称。'
     },
     {
-      title: '直开与斜开',
-      text: '这 26 个开局通常分成两大类：13 个直开和 13 个斜开。',
-      source: 'https://gomoku.renju.net/openings/'
+      title: '出库之后',
+      text: '一旦局面偏离已知定式，程序就需要重新回到常规判断，而不能继续照搬开局知识。'
+    }
+  ],
+  lan: [
+    {
+      title: '同盘对局',
+      text: '局域网联机模式下，双方浏览器看到的是同一个房间里的同一盘棋。'
     },
     {
-      title: '开局有名字',
-      text: '这些开局并不是编号而已，它们各自还有名字，例如 Chosei、Suigetsu、Kansei、Kagetsu。',
-      source: 'https://gomoku.renju.net/openings/'
+      title: '房主执黑',
+      text: '当前联机模式里，房主执黑先行，加入房间的玩家执白后手。'
     },
     {
-      title: '国际组织',
-      text: 'Renju International Federation 成立于 1988 年 8 月 8 日，地点是瑞典斯德哥尔摩。',
-      source: 'https://en.wikipedia.org/wiki/Renju'
-    },
-    {
-      title: '世界赛传统',
-      text: '连珠世界锦标赛自 1989 年起按双年周期举办，女子和团体世界赛也都已经形成了固定体系。',
-      source: 'https://en.wikipedia.org/wiki/Renju'
-    },
-    {
-      title: '还有未解空间',
-      text: '自由连珠在 2001 年已被证明为先手胜，但带现代开局规则的连珠仍然没有被完全解完。',
-      source: 'https://en.wikipedia.org/wiki/Renju'
+      title: '房间同步',
+      text: '落子信息会写回服务器中的房间状态，再同步给房间里的另一位玩家。'
     }
   ]
 };
@@ -239,6 +158,12 @@ let rafId = null;
 let flashTimer = null;
 let resultTimer = null;
 let triviaSeed = 0;
+let lanSession = {
+  active: false,
+  roomId: '',
+  seat: 0,
+  pollTimer: null
+};
 
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
@@ -261,49 +186,32 @@ function setDiffPanel(open) {
   chevron.classList.toggle('rotated', open);
 }
 
+function setLanPanel(open) {
+  const panel = document.getElementById('lan-panel');
+  const chevron = document.getElementById('lan-chevron');
+  panel.classList.toggle('open', open);
+  chevron.classList.toggle('rotated', open);
+}
+
 function toggleDiffPanel() {
   const panel = document.getElementById('diff-panel');
   setDiffPanel(!panel.classList.contains('open'));
 }
 
-function goHome() {
-  clearResultTimer();
-  hideResult();
-  closeReview();
-  setFlash('', 0);
-  showView('view-home');
+function toggleLanPanel() {
+  const panel = document.getElementById('lan-panel');
+  setLanPanel(!panel.classList.contains('open'));
 }
 
-async function startGame(mode, diff) {
-  if (busy) return;
+function setLanHomeNote(message) {
+  const note = document.getElementById('lan-home-note');
+  if (!note) return;
+  note.textContent = message || DEFAULT_LAN_HOME_NOTE;
+}
 
-  currentMode = mode;
-  currentDiff = diff;
-  triviaSeed += 1;
-  hintPos = null;
-  moveHistory = [];
-  setDiffPanel(false);
-  clearResultTimer();
-  hideResult();
-  closeReview();
-  setFlash('', 0);
-  showView('view-game');
-
+function updateModeLabel(mode, diff) {
   const key = mode === 'pvp' ? 'pvp' : diff;
   document.getElementById('mode-label').textContent = DISPLAY_MODE_TEXT[key] || key;
-  showAlgoDetail(mode, diff);
-  updatePredictionPanel(null);
-  updateTriviaPanel({ mode, difficulty: diff });
-
-  setLoading(true);
-  try {
-    const data = await api(`/api/new?mode=${mode}&diff=${diff}`);
-    applyState(data, { action: 'new' });
-  } catch (error) {
-    setFlash('新对局创建失败，请重试。');
-  } finally {
-    setLoading(false);
-  }
 }
 
 function showAlgoDetail(mode, diff) {
@@ -312,26 +220,296 @@ function showAlgoDetail(mode, diff) {
   });
   const key = mode === 'pvp' ? 'pvp' : diff;
   const target = document.querySelector(`.algo-detail-block[data-diff="${key}"]`);
-  if (target) target.classList.add('visible');
+  if (target) {
+    target.classList.add('visible');
+  }
+}
+
+function prepareGameView(mode, diff) {
+  currentMode = mode;
+  currentDiff = diff;
+  triviaSeed += 1;
+  hintPos = null;
+  moveHistory = [];
+  dropFrames = [];
+  pulseFrames = [];
+  setDiffPanel(false);
+  setLanPanel(false);
+  clearResultTimer();
+  hideResult();
+  closeReview();
+  setFlash('', 0);
+  showView('view-game');
+  updateModeLabel(mode, diff);
+  showAlgoDetail(mode, diff);
+  updatePredictionPanel(null);
+  updateTriviaPanel({ mode, difficulty: diff });
+  if (mode !== 'lan') {
+    hideLanRoomPanel();
+  }
+}
+
+function clearLanSession() {
+  lanSession.active = false;
+  lanSession.roomId = '';
+  lanSession.seat = 0;
+}
+
+function stopLanPolling() {
+  if (lanSession.pollTimer) {
+    clearTimeout(lanSession.pollTimer);
+    lanSession.pollTimer = null;
+  }
+}
+
+function leaveLanRoom(notifyServer = true) {
+  if (!lanSession.active || !lanSession.roomId || !lanSession.seat) {
+    clearLanSession();
+    return;
+  }
+
+  if (notifyServer) {
+    const url = `/api/lan/leave?room=${encodeURIComponent(lanSession.roomId)}&player=${lanSession.seat}`;
+    fetch(url, { keepalive: true }).catch(() => {});
+  }
+
+  clearLanSession();
+}
+
+function goHome() {
+  stopLanPolling();
+  leaveLanRoom();
+  clearResultTimer();
+  hideResult();
+  closeReview();
+  hideLanRoomPanel();
+  setFlash('', 0);
+  setLanHomeNote('');
+  showView('view-home');
 }
 
 async function api(url) {
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status}`);
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
   }
-  return res.json();
+  return response.json();
+}
+
+function hasBoardState(data) {
+  return !!data && Array.isArray(data.board);
+}
+
+function humanizeMessage(message) {
+  return FRIENDLY_MESSAGES[message] || '';
+}
+
+function handleLanFailureAndReturnHome(message) {
+  stopLanPolling();
+  hideLanRoomPanel();
+  leaveLanRoom(false);
+  showView('view-home');
+  setLanPanel(true);
+  setLanHomeNote(message || DEFAULT_LAN_HOME_NOTE);
+}
+
+function activateLanSession(data) {
+  lanSession.active = true;
+  lanSession.roomId = data.roomId || '';
+  lanSession.seat = Number(data.seat || 0);
+  updateLanRoomPanel(data);
+}
+
+function scheduleLanPoll() {
+  stopLanPolling();
+  if (!lanSession.active) return;
+  lanSession.pollTimer = window.setTimeout(() => {
+    pollLanState();
+  }, 1000);
+}
+
+async function pollLanState() {
+  if (!lanSession.active || busy) {
+    scheduleLanPoll();
+    return;
+  }
+
+  try {
+    const data = await api(`/api/lan/state?room=${encodeURIComponent(lanSession.roomId)}&player=${lanSession.seat}`);
+    if (!data.ok || !hasBoardState(data)) {
+      handleLanFailureAndReturnHome(humanizeMessage(data.message) || '房间已不可用。');
+      return;
+    }
+    applyState(data, { action: 'poll' });
+  } catch (_error) {
+    // Ignore transient network errors and keep polling.
+  } finally {
+    scheduleLanPoll();
+  }
+}
+
+async function startGame(mode, diff) {
+  if (busy) return;
+
+  stopLanPolling();
+  leaveLanRoom();
+  prepareGameView(mode, diff);
+
+  setLoading(true);
+  try {
+    const data = await api(`/api/new?mode=${mode}&diff=${diff}`);
+    applyState(data, { action: 'new' });
+  } catch (_error) {
+    setFlash('新对局创建失败，请重试。');
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function startLanHost() {
+  if (busy) return;
+
+  stopLanPolling();
+  leaveLanRoom();
+  setLanHomeNote('');
+  prepareGameView('lan', 'lan');
+
+  setLoading(true);
+  try {
+    const data = await api('/api/lan/create');
+    if (!data.ok || !hasBoardState(data)) {
+      handleLanFailureAndReturnHome(humanizeMessage(data.message) || '创建房间失败，请重试。');
+      return;
+    }
+    activateLanSession(data);
+    applyState(data, { action: 'new' });
+    scheduleLanPoll();
+  } catch (_error) {
+    handleLanFailureAndReturnHome('创建房间失败，请重试。');
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function joinLanRoom() {
+  if (busy) return;
+
+  const input = document.getElementById('lan-room-input');
+  const roomId = (input.value || '').trim();
+  if (!roomId) {
+    setLanPanel(true);
+    setLanHomeNote('请先输入房间号。');
+    input.focus();
+    return;
+  }
+
+  stopLanPolling();
+  leaveLanRoom();
+  setLanHomeNote('');
+  prepareGameView('lan', 'lan');
+
+  setLoading(true);
+  try {
+    const data = await api(`/api/lan/join?room=${encodeURIComponent(roomId)}`);
+    if (!data.ok || !hasBoardState(data)) {
+      handleLanFailureAndReturnHome(humanizeMessage(data.message) || '加入房间失败，请检查房间号。');
+      return;
+    }
+    input.value = '';
+    activateLanSession(data);
+    applyState(data, { action: 'new' });
+    scheduleLanPoll();
+  } catch (_error) {
+    handleLanFailureAndReturnHome('加入房间失败，请重试。');
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function handleLanReset() {
+  if (!lanSession.active) return;
+  if (lanSession.seat !== 1) {
+    setFlash('只有房主可以重新开始本房间。');
+    return;
+  }
+
+  setLoading(true);
+  try {
+    const data = await api(`/api/lan/reset?room=${encodeURIComponent(lanSession.roomId)}&player=${lanSession.seat}`);
+    if (!data.ok || !hasBoardState(data)) {
+      handleLanFailureAndReturnHome(humanizeMessage(data.message) || '房间重开失败，请重试。');
+      return;
+    }
+    applyState(data, { action: 'new' });
+  } catch (_error) {
+    setFlash('房间重开失败，请重试。');
+  } finally {
+    setLoading(false);
+  }
+}
+
+function hideLanRoomPanel() {
+  const panel = document.getElementById('lan-room-panel');
+  panel.classList.add('hidden');
+}
+
+function updateLanRoomPanel(data) {
+  const panel = document.getElementById('lan-room-panel');
+  const roomIdEl = document.getElementById('lan-room-id');
+  const seatEl = document.getElementById('lan-seat-label');
+  const noteEl = document.getElementById('lan-room-note');
+
+  if (!data || data.mode !== 'lan') {
+    panel.classList.add('hidden');
+    return;
+  }
+
+  panel.classList.remove('hidden');
+  roomIdEl.textContent = data.roomId || '--';
+
+  if (lanSession.seat === 1) {
+    seatEl.textContent = '房主 · 执黑';
+  } else if (lanSession.seat === 2) {
+    seatEl.textContent = '客方 · 执白';
+  } else {
+    seatEl.textContent = '--';
+  }
+
+  if (!data.roomReady) {
+    if (data.moveCount > 0) {
+      noteEl.textContent = lanSession.seat === 1 ? '白方已离开房间，等待重新加入。' : '等待房主或另一位玩家就位。';
+    } else {
+      noteEl.textContent = lanSession.seat === 1 ? '房间已创建，等待白方加入。' : '等待房主准备。';
+    }
+    return;
+  }
+
+  if (data.gameOver) {
+    noteEl.textContent = '本局已结束，可复盘或由房主重开。';
+    return;
+  }
+
+  noteEl.textContent = data.currentPlayer === lanSession.seat ? '轮到你落子。' : '等待对方落子。';
 }
 
 async function doMove(row, col) {
   if (busy || !state || state.gameOver || reviewState.open) return;
-  if (state.mode === 'ai' && state.currentPlayer !== 1) return;
 
   setLoading(true);
   try {
-    const data = await api(`/api/move?row=${row}&col=${col}`);
+    let data;
+    if (state.mode === 'lan') {
+      data = await api(`/api/lan/move?room=${encodeURIComponent(lanSession.roomId)}&player=${lanSession.seat}&row=${row}&col=${col}`);
+      if (!data.ok && !hasBoardState(data)) {
+        handleLanFailureAndReturnHome(humanizeMessage(data.message) || '房间已不可用。');
+        return;
+      }
+    } else {
+      data = await api(`/api/move?row=${row}&col=${col}`);
+    }
+
     applyState(data, { action: 'move', moveRow: row, moveCol: col });
-  } catch (error) {
+  } catch (_error) {
     setFlash('落子失败，请重试。');
   } finally {
     setLoading(false);
@@ -339,13 +517,13 @@ async function doMove(row, col) {
 }
 
 async function handleUndo() {
-  if (busy || !state || reviewState.open) return;
+  if (busy || !state || reviewState.open || state.mode === 'lan') return;
 
   setLoading(true);
   try {
     const data = await api('/api/undo');
     applyState(data, { action: 'undo' });
-  } catch (error) {
+  } catch (_error) {
     setFlash('悔棋失败，请重试。');
   } finally {
     setLoading(false);
@@ -353,7 +531,7 @@ async function handleUndo() {
 }
 
 async function handleHint() {
-  if (busy || !state || reviewState.open) return;
+  if (busy || !state || reviewState.open || state.mode === 'lan') return;
   if (!isHumanTurn(state)) return;
 
   setLoading(true);
@@ -365,9 +543,9 @@ async function handleHint() {
       updateButtons();
       startRaf();
     } else {
-      setFlash(data.message || '当前不能请求帮助。');
+      setFlash(humanizeMessage(data.message) || '当前不能请求帮助。');
     }
-  } catch (error) {
+  } catch (_error) {
     setFlash('帮助请求失败，请重试。');
   } finally {
     setLoading(false);
@@ -406,81 +584,14 @@ function stepReview(delta) {
   startRaf();
 }
 
-function applyState(data, options = {}) {
-  const prev = state;
-  const action = options.action || 'state';
-  state = data;
-
-  if (action === 'new' || !prev) {
-    moveHistory = [cloneBoard(data.board)];
-  } else if (action === 'move' && data.ok) {
-    appendMoveSnapshots(prev, data, options.moveRow, options.moveCol);
-  } else if (action === 'undo' && data.ok) {
-    syncHistoryAfterUndo(data.board, data.moveCount);
-  }
-
-  if (action === 'new' || (data.ok && (action === 'move' || action === 'undo'))) {
-    hintPos = null;
-  }
-
-  dropFrames = [];
-  if (prev && !reviewState.open) {
-    dropFrames = findDiffs(prev.board, data.board)
-      .filter((diff) => diff.value !== 0)
-      .map((diff) => ({ row: diff.row, col: diff.col, stone: diff.value, t: 0 }));
-  }
-
-  pulseFrames = [];
-  if (!reviewState.open && action !== 'undo' && data.lastRow >= 0 && data.lastCol >= 0) {
-    pulseFrames.push({ row: data.lastRow, col: data.lastCol, t: 0 });
-  }
-
-  if (!data.gameOver) {
-    clearResultTimer();
-    hideResult();
-  }
-
-  updateTurnIndicator(data);
-  updateButtons();
-  updateReviewUI();
-  updatePredictionPanel(data);
-  updateTriviaPanel(data);
-
-  if (action === 'new' && data.ok) {
-    setFlash('新对局已开始。');
-  } else if (action === 'undo') {
-    setFlash(data.ok ? '已悔棋。' : (data.message || '当前没有可悔棋的步骤。'));
-  } else if (!data.ok) {
-    setFlash(data.message || '当前不能这样操作。');
-  } else {
-    setFlash('', 0);
-  }
-
-  if (action === 'undo' && !data.ok) {
-    const friendlyMessage = humanizeMessage(data.message);
-    if (friendlyMessage) {
-      setFlash(friendlyMessage);
-    }
-  } else if (!data.ok) {
-    const friendlyMessage = humanizeMessage(data.message);
-    if (friendlyMessage) {
-      setFlash(friendlyMessage);
-    }
-  }
-
-  startRaf();
-}
-
 function appendMoveSnapshots(prev, data, moveRow, moveCol) {
-  const diffs = findDiffs(prev.board, data.board);
+  const diffs = findDiffs(prev.board, data.board).filter((diff) => diff.value !== 0);
   if (diffs.length === 0) return;
 
   if (prev.mode === 'ai' && diffs.length === 2 && Number.isInteger(moveRow) && Number.isInteger(moveCol)) {
     const midBoard = cloneBoard(prev.board);
     midBoard[moveRow][moveCol] = prev.currentPlayer;
     pushHistoryBoard(midBoard);
-    pushHistoryBoard(cloneBoard(data.board));
-    return;
   }
 
   pushHistoryBoard(cloneBoard(data.board));
@@ -501,6 +612,97 @@ function pushHistoryBoard(board) {
   if (!last || !boardsEqual(last, board)) {
     moveHistory.push(board);
   }
+}
+
+function isRemoteLanReset(prev, data, action) {
+  return action === 'poll'
+    && !!prev
+    && prev.mode === 'lan'
+    && data.mode === 'lan'
+    && prev.moveCount > 0
+    && data.moveCount === 0
+    && data.lastRow < 0
+    && data.lastCol < 0;
+}
+
+function applyState(data, options = {}) {
+  if (!hasBoardState(data)) return;
+
+  const prev = state;
+  const rawAction = options.action || 'state';
+  const remoteReset = isRemoteLanReset(prev, data, rawAction);
+  const action = remoteReset ? 'new' : rawAction;
+  const diffs = prev ? findDiffs(prev.board, data.board) : [];
+  const addedDiffs = diffs.filter((diff) => diff.value !== 0);
+
+  state = data;
+  currentMode = data.mode;
+  currentDiff = data.difficulty;
+
+  if (action === 'new' || !prev) {
+    moveHistory = [cloneBoard(data.board)];
+  } else if ((action === 'move' || action === 'poll') && data.ok && diffs.length > 0) {
+    appendMoveSnapshots(prev, data, options.moveRow, options.moveCol);
+  } else if (action === 'undo' && data.ok) {
+    syncHistoryAfterUndo(data.board, data.moveCount);
+  }
+
+  if (action === 'new' || (data.ok && (action === 'move' || action === 'undo'))) {
+    hintPos = null;
+  }
+
+  if (remoteReset) {
+    clearResultTimer();
+    hideResult();
+    closeReview();
+  }
+
+  dropFrames = [];
+  if (prev && !reviewState.open) {
+    dropFrames = addedDiffs.map((diff) => ({
+      row: diff.row,
+      col: diff.col,
+      stone: diff.value,
+      t: 0
+    }));
+  }
+
+  pulseFrames = [];
+  if (!reviewState.open && action !== 'undo' && addedDiffs.length > 0) {
+    pulseFrames.push({
+      row: data.lastRow,
+      col: data.lastCol,
+      t: 0
+    });
+  }
+
+  if (!data.gameOver) {
+    clearResultTimer();
+    hideResult();
+  }
+
+  updateModeLabel(data.mode, data.difficulty);
+  showAlgoDetail(data.mode, data.difficulty);
+  updateTurnIndicator(data);
+  updateButtons();
+  updateReviewUI();
+  updateLanRoomPanel(data);
+  updatePredictionPanel(data);
+  updateTriviaPanel(data);
+
+  if (remoteReset) {
+    setFlash('房间已重开。');
+  } else if (action === 'new' && data.ok) {
+    setFlash(humanizeMessage(data.message) || '新对局已开始。');
+  } else if (action === 'undo') {
+    setFlash(data.ok ? '已悔棋。' : (humanizeMessage(data.message) || '当前没有可悔棋的步骤。'));
+  } else if (!data.ok) {
+    setFlash(humanizeMessage(data.message) || '当前不能这样操作。');
+  } else {
+    setFlash('', 0);
+  }
+
+  startRaf();
 }
 
 function updateTurnIndicator(data) {
@@ -531,6 +733,19 @@ function updateTurnIndicator(data) {
   }
 
   clearResultTimer();
+
+  if (data.mode === 'lan' && !data.roomReady) {
+    stone.classList.add(lanSession.seat === 1 ? 'black' : 'white');
+    text.textContent = lanSession.seat === 1 ? '等待白方加入' : '等待房主开始';
+    return;
+  }
+
+  if (data.mode === 'lan') {
+    stone.classList.add(data.currentPlayer === 1 ? 'black' : 'white');
+    text.textContent = data.currentPlayer === lanSession.seat ? '轮到你落子' : '等待对方落子';
+    return;
+  }
+
   if (data.mode === 'ai' && data.currentPlayer === 2) {
     stone.classList.add('white', 'ai');
     text.textContent = 'AI 回合';
@@ -573,6 +788,10 @@ function hideResult() {
 }
 
 function restartGame() {
+  if (lanSession.active) {
+    handleLanReset();
+    return;
+  }
   startGame(currentMode, currentDiff);
 }
 
@@ -585,7 +804,6 @@ function clearResultTimer() {
 
 function setLoading(on) {
   busy = on;
-  canvas.classList.toggle('locked', on || reviewState.open);
   document.getElementById('thinking-overlay').classList.toggle('hidden', !on);
   updateButtons();
 }
@@ -593,10 +811,12 @@ function setLoading(on) {
 function setFlash(message, timeout = 2200) {
   const el = document.getElementById('action-message');
   el.textContent = message || '';
+
   if (flashTimer) {
     clearTimeout(flashTimer);
     flashTimer = null;
   }
+
   if (message && timeout > 0) {
     flashTimer = window.setTimeout(() => {
       el.textContent = '';
@@ -610,15 +830,42 @@ function updateButtons() {
   const hintBtn = document.getElementById('hint-btn');
   const reviewBtn = document.getElementById('review-btn');
 
-  const canUndo = !!state && !busy && !reviewState.open && !state.gameOver && state.histCount > 0;
-  const canHint = !!state && !busy && !reviewState.open && isHumanTurn(state);
-  const canReview = !!state && !busy && !reviewState.open && state.gameOver && moveHistory.length > 1;
+  const canUndo = !!state
+    && state.mode !== 'lan'
+    && !busy
+    && !reviewState.open
+    && !state.gameOver
+    && state.histCount > 0;
+
+  const canHint = !!state
+    && state.mode !== 'lan'
+    && !busy
+    && !reviewState.open
+    && isHumanTurn(state);
+
+  const canReview = !!state
+    && !busy
+    && !reviewState.open
+    && state.gameOver
+    && moveHistory.length > 1;
+
+  const canPlayBoard = !!state
+    && !busy
+    && !reviewState.open
+    && isHumanTurn(state);
 
   undoBtn.disabled = !canUndo;
   hintBtn.disabled = !canHint;
   reviewBtn.disabled = !canReview;
+  canvas.classList.toggle('locked', !canPlayBoard);
+}
 
-  canvas.classList.toggle('locked', busy || reviewState.open);
+function formatPositionLabel(positionLabel, blackRate) {
+  if (positionLabel === 'black') return '黑优';
+  if (positionLabel === 'white') return '白优';
+  if (positionLabel === 'even') return '均势';
+  if (Math.abs(blackRate - 50) <= 5) return '均势';
+  return blackRate > 50 ? '黑优' : '白优';
 }
 
 function updatePredictionPanel(data) {
@@ -637,26 +884,16 @@ function updatePredictionPanel(data) {
     blackBarEl.style.width = '50%';
     whiteBarEl.style.width = '50%';
     return;
-    blackEl.textContent = '--';
-    whiteEl.textContent = '--';
-    labelEl.textContent = '等待对局';
-    scoreEl.textContent = '估值 --';
-    return;
   }
 
   const blackRate = Number(data.blackWinRate ?? 50);
   const whiteRate = Number(data.whiteWinRate ?? (100 - blackRate));
   blackEl.textContent = `${blackRate}%`;
   whiteEl.textContent = `${whiteRate}%`;
-  labelEl.textContent = labelFromRate(blackRate);
-  scoreEl.textContent = `估值 ${data.positionScore}`;
+  labelEl.textContent = formatPositionLabel(data.positionLabel, blackRate);
+  scoreEl.textContent = `估值 ${data.positionScore ?? 0}`;
   blackBarEl.style.width = `${blackRate}%`;
   whiteBarEl.style.width = `${whiteRate}%`;
-  return;
-  blackEl.textContent = `${data.blackWinRate}%`;
-  whiteEl.textContent = `${data.whiteWinRate}%`;
-  labelEl.textContent = data.positionLabel || '均势';
-  scoreEl.textContent = `估值 ${data.positionScore}`;
 }
 
 function updateTriviaPanel(data) {
@@ -665,10 +902,7 @@ function updateTriviaPanel(data) {
 
   if (!data) {
     titleEl.textContent = '等待对局开始';
-    textEl.textContent = '开始一局后，这里会显示一条和五子棋相关的小知识。';
-    return;
-    titleEl.textContent = '等待对局开始';
-    textEl.textContent = '进入一局后，这里会显示一条和当前模式相关的小知识。';
+    textEl.textContent = '进入对局后，这里会显示一条和五子棋相关的小知识。';
     return;
   }
 
@@ -682,23 +916,6 @@ function pickTriviaItem(key) {
   const pool = TRIVIA_FACTS_BY_KEY[key] || TRIVIA_FACTS_BY_KEY.easy;
   const index = ((triviaSeed - 1) % pool.length + pool.length) % pool.length;
   return pool[index];
-}
-
-function labelFromRate(blackRate) {
-  if (Math.abs(blackRate - 50) <= 5) return '均势';
-  return blackRate > 55 ? '黑优' : '白优';
-}
-
-function humanizeMessage(message) {
-  const MAP = {
-    no_undo: '当前没有可悔棋的步骤。',
-    game_over_review: '对局已结束，请通过复盘查看。',
-    game_over: '游戏已经结束，请重新开始。',
-    out_of_range: '坐标越界。',
-    occupied: '该位置已有棋子。',
-    wait_ai: '请等待 AI 落子。'
-  };
-  return MAP[message] || '';
 }
 
 function updateReviewUI() {
@@ -721,6 +938,9 @@ function updateReviewUI() {
 
 function isHumanTurn(data) {
   if (!data || data.gameOver) return false;
+  if (data.mode === 'lan') {
+    return !!data.roomReady && lanSession.active && lanSession.seat === data.currentPlayer;
+  }
   return data.mode === 'pvp' || data.currentPlayer === 1;
 }
 
@@ -731,7 +951,9 @@ function cloneBoard(board) {
 function boardsEqual(a, b) {
   for (let r = 0; r < SIZE; r += 1) {
     for (let c = 0; c < SIZE; c += 1) {
-      if (a[r][c] !== b[r][c]) return false;
+      if (a[r][c] !== b[r][c]) {
+        return false;
+      }
     }
   }
   return true;
@@ -818,6 +1040,7 @@ function drawBoardSurface(context) {
 function drawStone(context, row, col, stone, scale) {
   const x = cx(col);
   const y = cy(row);
+
   context.save();
   context.translate(x, y);
   context.scale(scale, scale);
@@ -856,6 +1079,7 @@ function drawPulse(context, row, col, t) {
   const y = cy(row);
   const radius = RADIUS + t * 12;
   const alpha = (1 - t) * 0.46;
+
   context.beginPath();
   context.arc(x, y, radius, 0, Math.PI * 2);
   context.strokeStyle = `rgba(177, 84, 64, ${alpha})`;
@@ -866,6 +1090,7 @@ function drawPulse(context, row, col, t) {
 function drawHintMark(context, row, col) {
   const x = cx(col);
   const y = cy(row);
+
   context.beginPath();
   context.arc(x, y, RADIUS + 5, 0, Math.PI * 2);
   context.strokeStyle = 'rgba(92, 208, 191, 0.88)';
@@ -934,13 +1159,15 @@ function render() {
 }
 
 function startRaf() {
-  if (rafId) cancelAnimationFrame(rafId);
+  if (rafId) {
+    cancelAnimationFrame(rafId);
+  }
   rafId = requestAnimationFrame(render);
 }
 
 canvas.addEventListener('click', (event) => {
   if (busy || !state || state.gameOver || reviewState.open) return;
-  if (state.mode === 'ai' && state.currentPlayer !== 1) return;
+  if (!isHumanTurn(state)) return;
 
   const rect = canvas.getBoundingClientRect();
   const scaleX = BOARD_PX / rect.width;
@@ -955,7 +1182,20 @@ canvas.addEventListener('click', (event) => {
   doMove(row, col);
 });
 
+document.getElementById('lan-room-input').addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    joinLanRoom();
+  }
+});
+
+window.addEventListener('beforeunload', () => {
+  stopLanPolling();
+  leaveLanRoom();
+});
+
 drawBoardSurface(ctx);
 updateButtons();
 updatePredictionPanel(null);
 updateTriviaPanel(null);
+setLanHomeNote('');

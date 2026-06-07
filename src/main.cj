@@ -6,6 +6,15 @@ import std.sync.*
 let game = GameState()
 let gameMutex = Mutex()
 
+func hintJson(ok: Bool, message: String, row: Int64, col: Int64): String {
+    return "{"
+        + "\"ok\":" + boolJson(ok) + ","
+        + "\"message\":\"" + message + "\","
+        + "\"row\":" + "${row}" + ","
+        + "\"col\":" + "${col}"
+        + "}"
+}
+
 func handleRequest(request: String): Array<Byte> {
     if (request == "") { return textResponse("400 Bad Request", "empty request") }
 
@@ -18,7 +27,6 @@ func handleRequest(request: String): Array<Byte> {
 
     let method = parts[0]
     let target = parts[1]
-
     if (method != "GET") {
         return textResponse("405 Method Not Allowed", "only GET is supported")
     }
@@ -31,11 +39,9 @@ func handleRequest(request: String): Array<Byte> {
     if (path == "/") {
         return serveFile("frontend/index.html", "text/html; charset=utf-8")
     }
-
     if (path == "/style.css") {
         return serveFile("frontend/style.css", "text/css; charset=utf-8")
     }
-
     if (path == "/app.js") {
         return serveFile("frontend/app.js", "application/javascript; charset=utf-8")
     }
@@ -69,8 +75,27 @@ func handleRequest(request: String): Array<Byte> {
         }
     }
 
-    if (path == "/favicon.ico") { return textResponse("404 Not Found", "") }
+    if (path == "/api/undo") {
+        synchronized(gameMutex) {
+            let result = game.undo()
+            return jsonResponse(game.stateJson(result.ok, result.message))
+        }
+    }
 
+    if (path == "/api/hint") {
+        synchronized(gameMutex) {
+            if (game.gameOver) {
+                return jsonResponse(hintJson(false, "对局已结束，无法提供帮助", -1, -1))
+            }
+            if (game.mode == "ai" && game.currentPlayer != 1) {
+                return jsonResponse(hintJson(false, "当前不是人类落子回合", -1, -1))
+            }
+            let point = game.hint()
+            return jsonResponse(hintJson(true, "", point.row, point.col))
+        }
+    }
+
+    if (path == "/favicon.ico") { return textResponse("404 Not Found", "") }
     return textResponse("404 Not Found", "not found")
 }
 
@@ -81,7 +106,7 @@ func handleClient(client: TcpSocket) {
 }
 
 main(): Int64 {
-    game.reset("pvp", "greedy")
+    game.reset("pvp", "easy")
     println("Gomoku server started at http://127.0.0.1:${SERVER_PORT}/")
 
     try (server = TcpServerSocket(bindAt: SERVER_PORT)) {

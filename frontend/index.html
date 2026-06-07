@@ -8,41 +8,40 @@
 </head>
 <body>
 
-<!-- 首页 -->
 <div id="view-home" class="view active">
   <div class="home-inner">
     <h1 class="site-title">仓颉五子棋</h1>
-    <p class="site-sub">基于仓颉语言后端的网页五子棋，五种 AI 难度</p>
+    <p class="site-sub">基于仓颉后端的网页五子棋，支持本地双人和五档 AI 难度。</p>
 
     <div class="mode-picker">
       <div class="mode-primary">
-        <button class="mode-btn primary" onclick="startGame('pvp','easy')">
+        <button class="mode-btn primary" onclick="startGame('pvp', 'easy')">
           <span class="mode-name">本地双人</span>
-          <span class="mode-desc">两人共用一台设备对弈</span>
+          <span class="mode-desc">两位玩家轮流在同一棋盘落子</span>
         </button>
         <button class="mode-btn primary" onclick="toggleDiffPanel()">
           <span class="mode-name">人机对战</span>
-          <span class="mode-desc">挑战五种强度 AI</span>
+          <span class="mode-desc">从 easy 到 joseki 选择你的对手</span>
           <span class="chevron" id="diff-chevron">›</span>
         </button>
       </div>
+
       <div class="diff-panel" id="diff-panel">
         <div class="diff-panel-inner">
-          <button class="diff-btn" onclick="startGame('ai','easy')"><span class="diff-name">简单</span><span class="diff-tag">入门</span></button>
-          <button class="diff-btn" onclick="startGame('ai','medium')"><span class="diff-name">Minimax</span><span class="diff-tag">初级</span></button>
-          <button class="diff-btn" onclick="startGame('ai','hard')"><span class="diff-name">Hard</span><span class="diff-tag">进阶</span></button>
-          <button class="diff-btn" onclick="startGame('ai','expert')"><span class="diff-name">专家</span><span class="diff-tag">高手</span></button>
-          <button class="diff-btn" onclick="startGame('ai','joseki')"><span class="diff-name">定式</span><span class="diff-tag">特殊</span></button>
+          <button class="diff-btn" onclick="startGame('ai', 'easy')"><span class="diff-name">Easy</span><span class="diff-tag">入门</span></button>
+          <button class="diff-btn" onclick="startGame('ai', 'medium')"><span class="diff-name">Medium</span><span class="diff-tag">Minimax</span></button>
+          <button class="diff-btn" onclick="startGame('ai', 'hard')"><span class="diff-name">Hard</span><span class="diff-tag">Alpha-Beta</span></button>
+          <button class="diff-btn" onclick="startGame('ai', 'expert')"><span class="diff-name">Expert</span><span class="diff-tag">预检</span></button>
+          <button class="diff-btn" onclick="startGame('ai', 'joseki')"><span class="diff-name">Joseki</span><span class="diff-tag">定式</span></button>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- 游戏视图 -->
 <div id="view-game" class="view">
   <div class="game-header">
-    <button class="back-btn" onclick="goHome()">← 返回</button>
+    <button class="back-btn" onclick="goHome()">返回首页</button>
     <span id="mode-label" class="mode-label"></span>
     <span id="status-text" class="status-text"></span>
   </div>
@@ -55,47 +54,51 @@
     </div>
   </div>
 
+  <div class="action-bar">
+    <button id="undo-btn" class="action-btn" onclick="handleUndo()">悔棋</button>
+    <button id="hint-btn" class="action-btn" onclick="handleHint()">帮助</button>
+    <button id="review-btn" class="action-btn" onclick="openReview()">复盘</button>
+  </div>
+  <p id="action-message" class="action-message"></p>
+
   <p id="algo-hint" class="algo-hint"></p>
 
   <div class="algo-detail-section">
     <div class="algo-detail-block" data-diff="pvp">
-      <h3>双人对弈</h3>
-      <p>两位玩家共用一台设备，轮流点击棋盘落子，先在横、竖、斜任意方向连成五子者获胜。无 AI 参与，完全由双方技术和博弈决定胜负。</p>
+      <h3>本地双人</h3>
+      <p>双方轮流落子，先在横、竖、斜任一方向连成五子者获胜。</p>
     </div>
     <div class="algo-detail-block" data-diff="easy">
-      <h3>贪心启发 + 随机扰动</h3>
-      <p>不使用树搜索，每次只看当前局面一步，模拟"会下棋但容易失误"的状态。</p>
-      <p><strong>决策流程：</strong>先检测对手是否将立即五连（必防），再检测己方是否已有必胜点（必走）；否则以 70% 概率取贪心最优点（评分 = 己方棋型得分×2 + 对方棋型得分），以 30% 概率在已有棋子周围随机选一个邻近空位。</p>
-      <p><strong>故意犯错的意义：</strong>随机扰动让 AI 在优势局面下仍会"失手"，为入门玩家提供练习空间。</p>
-      <p><strong>局限：</strong>无法识别两步以上的复合威胁，面对"双活三"、"跳活四"等进攻几乎无力应对。</p>
+      <h3>Easy</h3>
+      <p>优先处理立即赢棋和立即防守，其余时间以贪心为主，并混入少量随机邻近落点，适合入门练习。</p>
     </div>
     <div class="algo-detail-block" data-diff="medium">
-      <h3>Minimax 博弈树搜索（深度 3，候选 10）</h3>
-      <p>Minimax 假设双方都理性：AI 最大化己方得分，同时假设对手也在最大化对手得分（即最小化 AI 得分），两者交替，形成"最大-最小"递归树。</p>
-      <p><strong>搜索参数：</strong>深度 3 层（约看 3 步应对），每层候选点 10 个（按启发评分排序取前 10）。叶节点调用评估函数，综合所有方向的棋型（活三 1500 分、活四 10000 分、五连 100000 分等）打分，回溯选取最优路径。</p>
-      <p><strong>无剪枝的代价：</strong>需遍历全部候选子树，10³ = 1000 次评估。深度增加则指数爆炸，故限于 3 层。</p>
-      <p><strong>弱点：</strong>看不穿四步以上的组合进攻；候选点数少（10）导致某些刁钻落点不在视野内，可被中级玩家利用。</p>
+      <h3>Medium</h3>
+      <p>使用无剪枝 Minimax 搜索，深度 3、候选点 10，能形成基本策略，但仍可被中级玩家针对。</p>
     </div>
     <div class="algo-detail-block" data-diff="hard">
-      <h3>Alpha-Beta 剪枝搜索（深度 4，候选 15）</h3>
-      <p>Alpha-Beta 是 Minimax 的等价优化：维护 α（当前节点已知的最优下界）和 β（对手节点已知的最优上界）。当某子树的评估值已劣于祖先节点的已知最优解时，直接剪掉该子树——不影响最终结果，但大幅减少计算量。最优情况下搜索效率平方根级提升，相同时间可搜索更深。</p>
-      <p><strong>搜索参数：</strong>深度 4 层，候选 15 个。比 Minimax 深一层，剪枝补偿了候选点增加的代价。</p>
-      <p><strong>实际表现：</strong>能识别 4 步内的组合威胁，会主动构造双四、提前布局进攻路线，对活三和跳活四有稳定防守。</p>
-      <p><strong>弱点：</strong>候选截断（15 个）有时错过"看起来不起眼"的好棋，可利用远程布局绕过视野。</p>
+      <h3>Hard</h3>
+      <p>使用 Alpha-Beta 搜索，深度 4、候选点 15，能更稳定地规划攻防，是主要挑战档。</p>
     </div>
     <div class="algo-detail-block" data-diff="expert">
-      <h3>即时威胁预检 + Alpha-Beta（深度 4，候选 20）</h3>
-      <p>在 Hard 基础上增加"即时威胁预处理"：每次决策前先扫描全盘是否存在立即必胜点（己方落子即五连）或立即必防点（对手下一步即五连），若有则跳过树搜索直接返回——消除了有限深度搜索可能漏掉关键紧急局面的隐患。</p>
-      <p><strong>候选 20：</strong>比 Hard 多 5 个候选点，覆盖更多偏角落棋形，残局处理更稳健。</p>
-      <p><strong>与 Hard 的差距：</strong>在双方对攻的密集局面中最明显——Hard 有时因候选集截断错过防守，Expert 几乎不会。打败 Expert 通常需要构造"双活三"或在五步内产生两个独立进攻方向。</p>
+      <h3>Expert</h3>
+      <p>在 Hard 基础上增加立即必胜和立即必防预检，残局和对攻处理更稳。</p>
     </div>
     <div class="algo-detail-block" data-diff="joseki">
-      <h3>天元开局定式 + 出库退化</h3>
-      <p>定式（じょせき）是经研究验证的开局序列，双方在特定位置的应对被认为局部最优，偏离定式通常对偏离方不利。</p>
-      <p><strong>开局阶段：</strong>AI 执白，按预置的天元开局定式库应对——黑子首子落天元（棋盘正中 7,7），白子按固定序列应手（前 6~10 步）。</p>
-      <p><strong>出库机制：</strong>玩家走出定式库中没有记录的位置时，AI 立即退化为 Hard（Alpha-Beta 深度 4）强度。出库前 AI 只是"背谱"，并不理解当前局面的深层含义。</p>
-      <p><strong>破解方式：</strong>走定式库未覆盖的偏门落点，迫使 AI 提早出库。出库后失去定式优势，AI 退回 Hard 水平，这是破解本模式的核心策略。</p>
-      <p><strong>学习价值：</strong>适合想观察标准五子棋开局节奏的玩家——跟着定式走，体会为什么这些应对被认为均衡。</p>
+      <h3>Joseki</h3>
+      <p>前期优先按定式落子，走出定式库后退化为 Hard 水平，适合观察开局套路。</p>
+    </div>
+  </div>
+
+  <div id="review-overlay" class="review-overlay hidden" onclick="handleReviewOverlayClick(event)">
+    <div class="review-card">
+      <div class="review-title">终局复盘</div>
+      <div id="review-step" class="review-step"></div>
+      <div class="review-actions">
+        <button id="review-prev-btn" class="result-btn" onclick="stepReview(-1)">上一步</button>
+        <button id="review-next-btn" class="result-btn" onclick="stepReview(1)">下一步</button>
+        <button class="result-btn primary" onclick="closeReview()">退出复盘</button>
+      </div>
     </div>
   </div>
 
@@ -106,6 +109,7 @@
       <div class="result-sub" id="result-sub"></div>
       <div class="result-actions">
         <button class="result-btn primary" onclick="restartGame()">再来一局</button>
+        <button class="result-btn" onclick="openReview()">复盘</button>
         <button class="result-btn" onclick="goHome()">返回首页</button>
       </div>
     </div>

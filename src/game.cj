@@ -84,7 +84,7 @@ class GameState {
     }
 
     func patternScore(length: Int64, openEnds: Int64): Int64 {
-        if (length >= 5)              { return 100000 }
+        if (length >= 5) { return 100000 }
         if (length == 4 && openEnds == 2) { return 10000 }
         if (length == 4 && openEnds == 1) { return 4000 }
         if (length == 3 && openEnds == 2) { return 1500 }
@@ -101,7 +101,7 @@ class GameState {
         let length = left + right + 1
         var openEnds: Int64 = 0
         if (this.openEnd(row, col, -dr, -dc, left)) { openEnds += 1 }
-        if (this.openEnd(row, col, dr, dc, right))  { openEnds += 1 }
+        if (this.openEnd(row, col, dr, dc, right)) { openEnds += 1 }
         return this.patternScore(length, openEnds)
     }
 
@@ -134,6 +134,24 @@ class GameState {
         return abs64(row - CENTER) + abs64(col - CENTER)
     }
 
+    func copyBoard(): Array<Array<Int64>> {
+        return Array<Array<Int64>>(BOARD_SIZE, { r =>
+            Array<Int64>(BOARD_SIZE, { c => this.board[r][c] })
+        })
+    }
+
+    func swapBoardStones() {
+        for (row in 0..BOARD_SIZE) {
+            for (col in 0..BOARD_SIZE) {
+                if (this.board[row][col] == 1) {
+                    this.board[row][col] = 2
+                } else if (this.board[row][col] == 2) {
+                    this.board[row][col] = 1
+                }
+            }
+        }
+    }
+
     // --- AI core ---
 
     func evaluate(): Int64 {
@@ -155,39 +173,58 @@ class GameState {
         if (this.moveCount == 0) {
             return Array<Point>(1, { _ => Point(CENTER, CENTER) })
         }
-        var cRows   = Array<Int64>(BOARD_SIZE * BOARD_SIZE, repeat: 0)
-        var cCols   = Array<Int64>(BOARD_SIZE * BOARD_SIZE, repeat: 0)
+
+        var cRows = Array<Int64>(BOARD_SIZE * BOARD_SIZE, repeat: 0)
+        var cCols = Array<Int64>(BOARD_SIZE * BOARD_SIZE, repeat: 0)
         var cScores = Array<Int64>(BOARD_SIZE * BOARD_SIZE, repeat: 0)
         var count: Int64 = 0
+
         for (row in 0..BOARD_SIZE) {
             for (col in 0..BOARD_SIZE) {
                 if (this.board[row][col] != 0) { continue }
                 if (!this.hasNearbyStone(row, col, 2)) { continue }
-                let a = this.pointScore(row, col, 2)
-                let d = this.pointScore(row, col, 1)
-                var s: Int64 = a * 2 + d
-                if (a >= 100000)      { s = 2_000_000 }
-                else if (d >= 100000) { s = 1_500_000 }
-                cRows[count] = row; cCols[count] = col; cScores[count] = s
+
+                let attack = this.pointScore(row, col, 2)
+                let defend = this.pointScore(row, col, 1)
+                var score: Int64 = attack * 2 + defend
+                if (attack >= 100000) {
+                    score = 2_000_000
+                } else if (defend >= 100000) {
+                    score = 1_500_000
+                }
+
+                cRows[count] = row
+                cCols[count] = col
+                cScores[count] = score
                 count += 1
             }
         }
-        // 插入排序（降序），让 alpha-beta 从最优候选开始搜索
+
         var i: Int64 = 1
         while (i < count) {
-            let kr = cRows[i]; let kc = cCols[i]; let ks = cScores[i]
+            let keyRow = cRows[i]
+            let keyCol = cCols[i]
+            let keyScore = cScores[i]
             var j = i - 1
-            while (j >= 0 && cScores[j] < ks) {
-                cRows[j + 1] = cRows[j]; cCols[j + 1] = cCols[j]; cScores[j + 1] = cScores[j]
+            while (j >= 0 && cScores[j] < keyScore) {
+                cRows[j + 1] = cRows[j]
+                cCols[j + 1] = cCols[j]
+                cScores[j + 1] = cScores[j]
                 j -= 1
             }
-            cRows[j + 1] = kr; cCols[j + 1] = kc; cScores[j + 1] = ks
+            cRows[j + 1] = keyRow
+            cCols[j + 1] = keyCol
+            cScores[j + 1] = keyScore
             i += 1
         }
+
         let n = if (count < maxCands) { count } else { maxCands }
         var result = Array<Point>(n, { _ => Point(0, 0) })
         var k: Int64 = 0
-        while (k < n) { result[k] = Point(cRows[k], cCols[k]); k += 1 }
+        while (k < n) {
+            result[k] = Point(cRows[k], cCols[k])
+            k += 1
+        }
         return result
     }
 
@@ -202,16 +239,17 @@ class GameState {
         return -1
     }
 
-    // --- Easy: 防必输 + 70%贪心 + 30%随机邻近 ---
+    // --- Easy: forced moves + greedy + some randomness ---
 
     func chooseEasy(): Point {
         if (this.board[CENTER][CENTER] == 0) { return Point(CENTER, CENTER) }
-        // 必须防守或能赢时直接走
+
         let win = this.findWinningMove(2)
         if (win >= 0) { return Point(win / BOARD_SIZE, win % BOARD_SIZE) }
+
         let block = this.findWinningMove(1)
         if (block >= 0) { return Point(block / BOARD_SIZE, block % BOARD_SIZE) }
-        // 30% 概率从邻近空格随机选
+
         if (this.rng.nextInt64(10) < 3) {
             var pool = Array<Point>(BOARD_SIZE * BOARD_SIZE, { _ => Point(0, 0) })
             var poolSize: Int64 = 0
@@ -227,19 +265,24 @@ class GameState {
                 return pool[this.rng.nextInt64(poolSize)]
             }
         }
-        // 贪心最优
-        var bestRow: Int64 = -1; var bestCol: Int64 = -1
-        var bestScore: Int64 = -1; var bestBias: Int64 = 1_000_000
+
+        var bestRow: Int64 = -1
+        var bestCol: Int64 = -1
+        var bestScore: Int64 = -1
+        var bestBias: Int64 = 1_000_000
         for (row in 0..BOARD_SIZE) {
             for (col in 0..BOARD_SIZE) {
                 if (this.board[row][col] != 0) { continue }
                 if (!this.hasNearbyStone(row, col, 2)) { continue }
-                let a = this.pointScore(row, col, 2)
-                let d = this.pointScore(row, col, 1)
-                let score = a * 2 + d
+                let attack = this.pointScore(row, col, 2)
+                let defend = this.pointScore(row, col, 1)
+                let score = attack * 2 + defend
                 let bias = this.centerBias(row, col)
                 if (score > bestScore || (score == bestScore && bias < bestBias)) {
-                    bestScore = score; bestBias = bias; bestRow = row; bestCol = col
+                    bestScore = score
+                    bestBias = bias
+                    bestRow = row
+                    bestCol = col
                 }
             }
         }
@@ -247,7 +290,7 @@ class GameState {
         return Point(0, 0)
     }
 
-    // --- Medium: Minimax 深度3，候选10 ---
+    // --- Medium: minimax (no pruning) ---
 
     func minimax(depth: Int64, isMax: Bool): Int64 {
         if (this.gameOver) {
@@ -256,57 +299,80 @@ class GameState {
             return 0
         }
         if (depth == 0) { return this.evaluate() }
+
         let pts = this.candidatesN(10)
         if (pts.size == 0) { return this.evaluate() }
+
         if (isMax) {
             var best: Int64 = -2_000_000
             for (p in pts) {
                 this.board[p.row][p.col] = 2
-                let prevOver = this.gameOver; let prevWinner = this.winner; let prevPlayer = this.currentPlayer
+                let prevOver = this.gameOver
+                let prevWinner = this.winner
+                let prevPlayer = this.currentPlayer
                 this.moveCount += 1
                 if (this.hasFive(p.row, p.col, 2)) { this.gameOver = true; this.winner = 2 }
                 this.currentPlayer = 1
-                let v = this.minimax(depth - 1, false)
-                this.board[p.row][p.col] = 0; this.gameOver = prevOver; this.winner = prevWinner
-                this.currentPlayer = prevPlayer; this.moveCount -= 1
-                if (v > best) { best = v }
-            }
-            return best
-        } else {
-            var best: Int64 = 2_000_000
-            for (p in pts) {
-                this.board[p.row][p.col] = 1
-                let prevOver = this.gameOver; let prevWinner = this.winner; let prevPlayer = this.currentPlayer
-                this.moveCount += 1
-                if (this.hasFive(p.row, p.col, 1)) { this.gameOver = true; this.winner = 1 }
-                this.currentPlayer = 2
-                let v = this.minimax(depth - 1, true)
-                this.board[p.row][p.col] = 0; this.gameOver = prevOver; this.winner = prevWinner
-                this.currentPlayer = prevPlayer; this.moveCount -= 1
-                if (v < best) { best = v }
+                let value = this.minimax(depth - 1, false)
+                this.board[p.row][p.col] = 0
+                this.gameOver = prevOver
+                this.winner = prevWinner
+                this.currentPlayer = prevPlayer
+                this.moveCount -= 1
+                if (value > best) { best = value }
             }
             return best
         }
+
+        var best: Int64 = 2_000_000
+        for (p in pts) {
+            this.board[p.row][p.col] = 1
+            let prevOver = this.gameOver
+            let prevWinner = this.winner
+            let prevPlayer = this.currentPlayer
+            this.moveCount += 1
+            if (this.hasFive(p.row, p.col, 1)) { this.gameOver = true; this.winner = 1 }
+            this.currentPlayer = 2
+            let value = this.minimax(depth - 1, true)
+            this.board[p.row][p.col] = 0
+            this.gameOver = prevOver
+            this.winner = prevWinner
+            this.currentPlayer = prevPlayer
+            this.moveCount -= 1
+            if (value < best) { best = value }
+        }
+        return best
     }
 
     func chooseMinimax(): Point {
         let pts = this.candidatesN(10)
-        var bestRow: Int64 = pts[0].row; var bestCol: Int64 = pts[0].col; var best: Int64 = -2_000_000
+        var bestRow: Int64 = pts[0].row
+        var bestCol: Int64 = pts[0].col
+        var best: Int64 = -2_000_000
         for (p in pts) {
             this.board[p.row][p.col] = 2
-            let prevOver = this.gameOver; let prevWinner = this.winner; let prevPlayer = this.currentPlayer
+            let prevOver = this.gameOver
+            let prevWinner = this.winner
+            let prevPlayer = this.currentPlayer
             this.moveCount += 1
             if (this.hasFive(p.row, p.col, 2)) { this.gameOver = true; this.winner = 2 }
             this.currentPlayer = 1
-            let v = this.minimax(3, false)
-            this.board[p.row][p.col] = 0; this.gameOver = prevOver; this.winner = prevWinner
-            this.currentPlayer = prevPlayer; this.moveCount -= 1
-            if (v > best) { best = v; bestRow = p.row; bestCol = p.col }
+            let value = this.minimax(3, false)
+            this.board[p.row][p.col] = 0
+            this.gameOver = prevOver
+            this.winner = prevWinner
+            this.currentPlayer = prevPlayer
+            this.moveCount -= 1
+            if (value > best) {
+                best = value
+                bestRow = p.row
+                bestCol = p.col
+            }
         }
         return Point(bestRow, bestCol)
     }
 
-    // --- Hard/Expert: Alpha-Beta ---
+    // --- Hard / Expert: alpha-beta ---
 
     func alphaBeta(depth: Int64, alpha: Int64, beta: Int64, isMax: Bool, maxCands: Int64): Int64 {
         if (this.gameOver) {
@@ -315,62 +381,86 @@ class GameState {
             return 0
         }
         if (depth == 0) { return this.evaluate() }
+
         let pts = this.candidatesN(maxCands)
         if (pts.size == 0) { return this.evaluate() }
-        var a = alpha; var b = beta
+
+        var a = alpha
+        var b = beta
         if (isMax) {
             var best: Int64 = -2_000_000
             for (p in pts) {
                 this.board[p.row][p.col] = 2
-                let prevOver = this.gameOver; let prevWinner = this.winner; let prevPlayer = this.currentPlayer
+                let prevOver = this.gameOver
+                let prevWinner = this.winner
+                let prevPlayer = this.currentPlayer
                 this.moveCount += 1
                 if (this.hasFive(p.row, p.col, 2)) { this.gameOver = true; this.winner = 2 }
                 this.currentPlayer = 1
-                let v = this.alphaBeta(depth - 1, a, b, false, maxCands)
-                this.board[p.row][p.col] = 0; this.gameOver = prevOver; this.winner = prevWinner
-                this.currentPlayer = prevPlayer; this.moveCount -= 1
-                if (v > best) { best = v }
-                if (v > a) { a = v }
-                if (a >= b) { return best }
-            }
-            return best
-        } else {
-            var best: Int64 = 2_000_000
-            for (p in pts) {
-                this.board[p.row][p.col] = 1
-                let prevOver = this.gameOver; let prevWinner = this.winner; let prevPlayer = this.currentPlayer
-                this.moveCount += 1
-                if (this.hasFive(p.row, p.col, 1)) { this.gameOver = true; this.winner = 1 }
-                this.currentPlayer = 2
-                let v = this.alphaBeta(depth - 1, a, b, true, maxCands)
-                this.board[p.row][p.col] = 0; this.gameOver = prevOver; this.winner = prevWinner
-                this.currentPlayer = prevPlayer; this.moveCount -= 1
-                if (v < best) { best = v }
-                if (v < b) { b = v }
+                let value = this.alphaBeta(depth - 1, a, b, false, maxCands)
+                this.board[p.row][p.col] = 0
+                this.gameOver = prevOver
+                this.winner = prevWinner
+                this.currentPlayer = prevPlayer
+                this.moveCount -= 1
+                if (value > best) { best = value }
+                if (value > a) { a = value }
                 if (a >= b) { return best }
             }
             return best
         }
+
+        var best: Int64 = 2_000_000
+        for (p in pts) {
+            this.board[p.row][p.col] = 1
+            let prevOver = this.gameOver
+            let prevWinner = this.winner
+            let prevPlayer = this.currentPlayer
+            this.moveCount += 1
+            if (this.hasFive(p.row, p.col, 1)) { this.gameOver = true; this.winner = 1 }
+            this.currentPlayer = 2
+            let value = this.alphaBeta(depth - 1, a, b, true, maxCands)
+            this.board[p.row][p.col] = 0
+            this.gameOver = prevOver
+            this.winner = prevWinner
+            this.currentPlayer = prevPlayer
+            this.moveCount -= 1
+            if (value < best) { best = value }
+            if (value < b) { b = value }
+            if (a >= b) { return best }
+        }
+        return best
     }
 
     func chooseAlphaBetaN(depth: Int64, maxCands: Int64): Point {
         let pts = this.candidatesN(maxCands)
-        var bestRow: Int64 = pts[0].row; var bestCol: Int64 = pts[0].col; var best: Int64 = -2_000_000
+        var bestRow: Int64 = pts[0].row
+        var bestCol: Int64 = pts[0].col
+        var best: Int64 = -2_000_000
         for (p in pts) {
             this.board[p.row][p.col] = 2
-            let prevOver = this.gameOver; let prevWinner = this.winner; let prevPlayer = this.currentPlayer
+            let prevOver = this.gameOver
+            let prevWinner = this.winner
+            let prevPlayer = this.currentPlayer
             this.moveCount += 1
             if (this.hasFive(p.row, p.col, 2)) { this.gameOver = true; this.winner = 2 }
             this.currentPlayer = 1
-            let v = this.alphaBeta(depth, -2_000_000, 2_000_000, false, maxCands)
-            this.board[p.row][p.col] = 0; this.gameOver = prevOver; this.winner = prevWinner
-            this.currentPlayer = prevPlayer; this.moveCount -= 1
-            if (v > best) { best = v; bestRow = p.row; bestCol = p.col }
+            let value = this.alphaBeta(depth, -2_000_000, 2_000_000, false, maxCands)
+            this.board[p.row][p.col] = 0
+            this.gameOver = prevOver
+            this.winner = prevWinner
+            this.currentPlayer = prevPlayer
+            this.moveCount -= 1
+            if (value > best) {
+                best = value
+                bestRow = p.row
+                bestCol = p.col
+            }
         }
         return Point(bestRow, bestCol)
     }
 
-    // --- Expert: 预检必胜/防守 + Alpha-Beta ---
+    // --- Expert: forced win / forced defense + alpha-beta ---
 
     func chooseExpert(): Point {
         let win = this.findWinningMove(2)
@@ -380,66 +470,53 @@ class GameState {
         return this.chooseAlphaBetaN(4, 20)
     }
 
-    // --- Joseki: 硬编码天元开局定式，出库后用 hard ---
-    // 定式以相对天元坐标存储，每条是黑白交替的落子序列（从黑棋第一手开始）
-    // 棋盘坐标 = CENTER + 相对坐标
-    // AI 执白（player=2），读取定式中白棋落点（奇数位 0-indexed: 1,3,5,...）
+    // --- Joseki: center opening book, then fall back to hard ---
 
     func josekiBlackAt(dr: Int64, dc: Int64): Bool {
-        let r = CENTER + dr; let c = CENTER + dc
-        return this.isInside(r, c) && this.board[r][c] == 1
+        let row = CENTER + dr
+        let col = CENTER + dc
+        return this.isInside(row, col) && this.board[row][col] == 1
     }
 
     func josekiEmptyAt(dr: Int64, dc: Int64): Bool {
-        let r = CENTER + dr; let c = CENTER + dc
-        return this.isInside(r, c) && this.board[r][c] == 0
+        let row = CENTER + dr
+        let col = CENTER + dc
+        return this.isInside(row, col) && this.board[row][col] == 0
     }
 
-    // 返回白棋应走的相对坐标 (dr*100+dc)，-999 表示不在定式中
     func lookupJoseki(): Int64 {
         let mc = this.moveCount
-        // 定式：黑首着天元 (0,0) 是前提
         if (!this.josekiBlackAt(0, 0)) { return -999 }
 
-        // === 2手：黑天元，白的第一手（共8对称，取白棋常见应对位置）===
         if (mc == 1) {
-            // 白棋走 (0,2)：直线型开局
-            if (this.josekiEmptyAt(0, 2)) { return 2 }  // dr=0, dc=2
+            if (this.josekiEmptyAt(0, 2)) { return 2 }
             return -999
         }
 
-        // 以下匹配黑2手后的应对
-        // 变化A：黑(0,0)→黑(0,-1)，白应(0,2)→白(0,3) 直三变化
         if (mc == 3) {
-            if (this.josekiBlackAt(0, 0) && this.josekiBlackAt(0, -1) && this.josekiBlackAt(0, 2) == false) {
-                // 找白第一子位置
-                if (this.board[CENTER][CENTER + 2] == 2) {
-                    // 黑在(0,-1)方向扩展，白应堵(0,-2)
-                    if (this.josekiBlackAt(0, -1) && this.josekiEmptyAt(0, -2)) { return -200 + 0 } // dc=-2
-                }
+            if (this.josekiBlackAt(0, -1) && this.board[CENTER][CENTER + 2] == 2 && this.josekiEmptyAt(0, -2)) {
+                return -200
             }
-            if (this.josekiBlackAt(0, 0) && this.josekiBlackAt(1, 0) && this.board[CENTER][CENTER + 2] == 2) {
-                // 黑竖向扩展(1,0)，白应(2,0)堵
-                if (this.josekiEmptyAt(2, 0)) { return 200 } // dr=2,dc=0
+            if (this.josekiBlackAt(1, 0) && this.board[CENTER][CENTER + 2] == 2 && this.josekiEmptyAt(2, 0)) {
+                return 200
             }
-            // 斜三变化：黑(1,1)，白应(-1,-1)
             if (this.josekiBlackAt(1, 1) && this.board[CENTER][CENTER + 2] == 2 && this.josekiEmptyAt(-1, -1)) {
-                return -100 + (-1) // dr=-1,dc=-1 → 编码为 -1*100+(-1) = -101
+                return -101
             }
         }
 
         if (mc == 5) {
-            // 直三：黑(0,0),(0,-1),(0,-2)，白(0,2),(0,3)，白应走(0,4)堵死
-            if (this.josekiBlackAt(0, 0) && this.josekiBlackAt(0, -1) && this.josekiBlackAt(0, -2)
-                && this.board[CENTER][CENTER + 2] == 2 && this.board[CENTER][CENTER + 3] == 2
+            if (this.josekiBlackAt(0, -1) && this.josekiBlackAt(0, -2)
+                && this.board[CENTER][CENTER + 2] == 2
+                && this.board[CENTER][CENTER + 3] == 2
                 && this.josekiEmptyAt(0, 4)) {
-                return 4  // dr=0,dc=4
+                return 4
             }
-            // 斜三延伸：黑(0,0),(1,1),(2,2)，白(-1,-1),(-2,-2)，白应走(3,3)
-            if (this.josekiBlackAt(0, 0) && this.josekiBlackAt(1, 1) && this.josekiBlackAt(2, 2)
-                && this.board[CENTER - 1][CENTER - 1] == 2 && this.board[CENTER - 2][CENTER - 2] == 2
+            if (this.josekiBlackAt(1, 1) && this.josekiBlackAt(2, 2)
+                && this.board[CENTER - 1][CENTER - 1] == 2
+                && this.board[CENTER - 2][CENTER - 2] == 2
                 && this.josekiEmptyAt(3, 3)) {
-                return 303  // dr=3,dc=3
+                return 303
             }
         }
 
@@ -451,18 +528,14 @@ class GameState {
         if (code != -999) {
             var dr: Int64 = code / 100
             var dc: Int64 = code % 100
-            // 修正负数编码（仓颉整除向零截断）
-            if (code < 0 && code != -999) {
+            if (code < 0) {
                 dr = -((-code) / 100)
                 dc = -((-code) % 100)
-                // 重新解码: -101 → dr=-1,dc=-1; -200 → dr=-2,dc=0
                 if (code == -101) { dr = -1; dc = -1 }
                 else if (code == -200) { dr = -2; dc = 0 }
-                else if (code == -100) { dr = -1; dc = 0 }
             }
-            // code=2 时 dr=0,dc=2
-            if (code == 2)   { dr = 0; dc = 2 }
-            if (code == 4)   { dr = 0; dc = 4 }
+            if (code == 2) { dr = 0; dc = 2 }
+            if (code == 4) { dr = 0; dc = 4 }
             if (code == 200) { dr = 2; dc = 0 }
             if (code == 303) { dr = 3; dc = 3 }
             let row = CENTER + dr
@@ -471,13 +544,12 @@ class GameState {
                 return Point(row, col)
             }
         }
-        // 出库：用 hard 强度
         return this.chooseAlphaBetaN(4, 15)
     }
 
     func chooseAiMove(): Point {
         if (this.difficulty == "medium") { return this.chooseMinimax() }
-        if (this.difficulty == "hard")   { return this.chooseAlphaBetaN(4, 15) }
+        if (this.difficulty == "hard") { return this.chooseAlphaBetaN(4, 15) }
         if (this.difficulty == "expert") { return this.chooseExpert() }
         if (this.difficulty == "joseki") { return this.chooseJoseki() }
         return this.chooseEasy()
@@ -488,17 +560,19 @@ class GameState {
     func undo(): ApiResult {
         if (this.histCount == 0) { return ApiResult(false, "没有可悔棋的步骤") }
         if (this.gameOver) { return ApiResult(false, "对局已结束，请通过复盘查看") }
+
         let stepsToUndo = if (this.mode == "ai" && this.histCount >= 2) { 2 } else { 1 }
         let target = this.histCount - stepsToUndo
         let savedBoard = this.histBoards[target]
-        for (r in 0..BOARD_SIZE) {
-            for (c in 0..BOARD_SIZE) {
-                this.board[r][c] = savedBoard[r][c]
+        for (row in 0..BOARD_SIZE) {
+            for (col in 0..BOARD_SIZE) {
+                this.board[row][col] = savedBoard[row][col]
             }
         }
+
         this.currentPlayer = this.histPlayers[target]
         this.histCount = target
-        this.moveCount -= stepsToUndo
+        this.moveCount = target
         this.lastRow = -1
         this.lastCol = -1
         this.gameOver = false
@@ -509,32 +583,41 @@ class GameState {
     func hint(): Point {
         let win = this.findWinningMove(this.currentPlayer)
         if (win >= 0) { return Point(win / BOARD_SIZE, win % BOARD_SIZE) }
+
         let block = this.findWinningMove(otherPlayer(this.currentPlayer))
         if (block >= 0) { return Point(block / BOARD_SIZE, block % BOARD_SIZE) }
-        return this.chooseAlphaBetaN(4, 15)
+
+        if (this.currentPlayer == 2) { return this.chooseAlphaBetaN(4, 15) }
+
+        let prevPlayer = this.currentPlayer
+        this.swapBoardStones()
+        this.currentPlayer = 2
+        let point = this.chooseAlphaBetaN(4, 15)
+        this.swapBoardStones()
+        this.currentPlayer = prevPlayer
+        return point
     }
 
     func playerMove(row: Int64, col: Int64): ApiResult {
-        if (this.gameOver)              { return ApiResult(false, "游戏已经结束，请重新开始") }
-        if (!this.isInside(row, col))   { return ApiResult(false, "坐标越界") }
-        if (this.board[row][col] != 0)  { return ApiResult(false, "该位置已有棋子") }
+        if (this.gameOver) { return ApiResult(false, "游戏已经结束，请重新开始") }
+        if (!this.isInside(row, col)) { return ApiResult(false, "坐标越界") }
+        if (this.board[row][col] != 0) { return ApiResult(false, "该位置已有棋子") }
         if (this.mode == "ai" && this.currentPlayer != 1) { return ApiResult(false, "请等待 AI 落子") }
-        // 保存快照
-        let snap = Array<Array<Int64>>(BOARD_SIZE, { r => Array<Int64>(BOARD_SIZE, { c => this.board[r][c] }) })
-        this.histBoards[this.histCount] = snap
+
+        this.histBoards[this.histCount] = this.copyBoard()
         this.histPlayers[this.histCount] = this.currentPlayer
         this.histCount += 1
+
         this.placeCurrentStone(row, col)
         if (this.mode == "ai" && !this.gameOver && this.currentPlayer == 2) {
-            // 保存 AI 落子前快照
-            let snap2 = Array<Array<Int64>>(BOARD_SIZE, { r => Array<Int64>(BOARD_SIZE, { c => this.board[r][c] }) })
-            this.histBoards[this.histCount] = snap2
+            this.histBoards[this.histCount] = this.copyBoard()
             this.histPlayers[this.histCount] = 2
             this.histCount += 1
             let ai = this.chooseAiMove()
             this.placeCurrentStone(ai.row, ai.col)
             return ApiResult(true, "你已落子，AI 已应手")
         }
+
         return ApiResult(true, "落子成功")
     }
 
@@ -568,6 +651,7 @@ class GameState {
             + "\"moveCount\":" + "${this.moveCount}" + ","
             + "\"lastRow\":" + "${this.lastRow}" + ","
             + "\"lastCol\":" + "${this.lastCol}" + ","
+            + "\"histCount\":" + "${this.histCount}" + ","
             + "\"board\":" + this.boardJson()
             + "}"
     }

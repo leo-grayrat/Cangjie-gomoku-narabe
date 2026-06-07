@@ -2,89 +2,98 @@
 
 const SIZE = 15;
 const CELL = 36;
-const PAD  = 22;
+const PAD = 22;
 const RADIUS = 14;
 const BOARD_PX = PAD * 2 + CELL * (SIZE - 1);
 
 const ALGO_HINTS = {
-  easy:    '简单：防必输 + 70% 贪心启发 + 30% 随机邻近落子，会犯明显错误。',
-  medium:  'Minimax（深度 3，候选 10）：无剪枝递归搜索，有基本策略意识，中级玩家可击败。',
-  hard:    'Alpha-Beta（深度 4，候选 15）：剪枝优化搜索，需要提前规划才能取胜。',
-  expert:  '专家：预检必胜/必防点 + Alpha-Beta（深度 4，候选 20），最强搜索难度。',
-  joseki:  '定式：前期按天元开局定式落子，出库后退化为 Hard 强度。知道定式的玩家可专门引它出库。',
+  easy: 'Easy：防立即输棋，带少量随机扰动，适合刚上手的玩家。',
+  medium: 'Medium：Minimax 深度 3，能形成基本攻防，但仍有明显套路可抓。',
+  hard: 'Hard：Alpha-Beta 深度 4，搜索更稳，适合想认真对局时挑战。',
+  expert: 'Expert：在 Hard 基础上增加立即必胜/必防预检，残局更强。',
+  joseki: 'Joseki：前期优先走定式，走出定式后退化为 Hard 强度。'
 };
 
 const ALGO_NAMES = {
-  easy: '人机·简单', medium: '人机·Minimax',
-  hard: '人机·Hard', expert: '人机·专家', joseki: '人机·定式',
+  easy: '人机 · Easy',
+  medium: '人机 · Medium',
+  hard: '人机 · Hard',
+  expert: '人机 · Expert',
+  joseki: '人机 · Joseki'
 };
 
 let state = null;
-let busy  = false;
-let currentMode = 'ai', currentDiff = 'easy';
-
+let busy = false;
+let currentMode = 'ai';
+let currentDiff = 'easy';
+let hintPos = null;
+let moveHistory = [];
+let reviewState = { open: false, index: 0 };
 let pulseFrames = [];
-let dropFrames  = [];
-let rafId       = null;
+let dropFrames = [];
+let rafId = null;
+let flashTimer = null;
+let resultTimer = null;
 
-const canvas  = document.getElementById('board');
-const ctx     = canvas.getContext('2d');
-canvas.width  = BOARD_PX;
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+canvas.width = BOARD_PX;
 canvas.height = BOARD_PX;
 
-// ── Views ──────────────────────────────────────────────────────
-
 function showView(id) {
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active', 'slide-in'));
+  document.querySelectorAll('.view').forEach(view => view.classList.remove('active', 'slide-in'));
   const target = document.getElementById(id);
   target.classList.add('active', 'slide-in');
 }
 
-function goHome() {
-  hideResult();
-  showView('view-home');
-}
-
-// ── Home interactions ──────────────────────────────────────────
-
 function toggleDiffPanel() {
   const panel = document.getElementById('diff-panel');
   const chevron = document.getElementById('diff-chevron');
-  chevron.classList.toggle('rotated', panel.classList.toggle('open'));
+  const open = panel.classList.toggle('open');
+  chevron.classList.toggle('rotated', open);
 }
 
-// ── Game lifecycle ─────────────────────────────────────────────
+function goHome() {
+  clearResultTimer();
+  hideResult();
+  closeReview();
+  setFlash('', 0);
+  showView('view-home');
+}
 
 async function startGame(mode, diff) {
   if (busy) return;
+
   currentMode = mode;
   currentDiff = diff;
+  hintPos = null;
+  hideResult();
+  closeReview();
+  clearResultTimer();
+  setFlash('', 0);
   showView('view-game');
 
-  const label = mode === 'pvp' ? '本地双人' : (ALGO_NAMES[diff] || diff);
-  document.getElementById('mode-label').textContent = label;
+  document.getElementById('mode-label').textContent =
+    mode === 'pvp' ? '本地双人' : (ALGO_NAMES[diff] || diff);
   document.getElementById('algo-hint').textContent =
-    mode === 'pvp' ? '双人对弈模式：两位玩家轮流落子，先连五子者获胜。' : (ALGO_HINTS[diff] || '');
-
+    mode === 'pvp' ? '双人模式下双方轮流落子，帮助功能会为当前落子方给出建议。' : (ALGO_HINTS[diff] || '');
   showAlgoDetail(mode, diff);
 
   setLoading(true);
   try {
     const data = await api(`/api/new?mode=${mode}&diff=${diff}`);
-    applyState(data);
+    applyState(data, { action: 'new' });
   } finally {
     setLoading(false);
   }
 }
 
 function showAlgoDetail(mode, diff) {
-  document.querySelectorAll('.algo-detail-block').forEach(b => b.classList.remove('visible'));
+  document.querySelectorAll('.algo-detail-block').forEach(block => block.classList.remove('visible'));
   const key = mode === 'pvp' ? 'pvp' : diff;
-  const block = document.querySelector(`.algo-detail-block[data-diff="${key}"]`);
-  if (block) block.classList.add('visible');
+  const target = document.querySelector(`.algo-detail-block[data-diff="${key}"]`);
+  if (target) target.classList.add('visible');
 }
-
-// ── API ────────────────────────────────────────────────────────
 
 async function api(url) {
   const res = await fetch(url);
@@ -92,172 +101,476 @@ async function api(url) {
 }
 
 async function doMove(row, col) {
-  if (busy || !state || state.gameOver) return;
+  if (busy || !state || state.gameOver || reviewState.open) return;
   if (state.mode === 'ai' && state.currentPlayer !== 1) return;
+
   setLoading(true);
   try {
     const data = await api(`/api/move?row=${row}&col=${col}`);
-    applyState(data);
+    applyState(data, { action: 'move', moveRow: row, moveCol: col });
   } finally {
     setLoading(false);
   }
 }
 
-// ── State ──────────────────────────────────────────────────────
+async function handleUndo() {
+  if (busy || !state || reviewState.open) return;
 
-function applyState(data) {
+  setLoading(true);
+  try {
+    const data = await api('/api/undo');
+    applyState(data, { action: 'undo' });
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function handleHint() {
+  if (busy || !state || reviewState.open) return;
+  if (!isHumanTurn(state)) return;
+
+  setLoading(true);
+  try {
+    const data = await api('/api/hint');
+    if (data.ok) {
+      hintPos = { row: data.row, col: data.col };
+      setFlash('已标出建议落点');
+      updateButtons();
+      startRaf();
+    } else {
+      setFlash(data.message || '当前无法提供帮助');
+    }
+  } finally {
+    setLoading(false);
+  }
+}
+
+function openReview() {
+  if (!state || !state.gameOver || moveHistory.length <= 1) {
+    setFlash('终局后才能进入复盘');
+    return;
+  }
+
+  reviewState.open = true;
+  reviewState.index = moveHistory.length - 1;
+  hideResult();
+  document.getElementById('review-overlay').classList.remove('hidden');
+  updateReviewUI();
+  updateButtons();
+  startRaf();
+}
+
+function closeReview() {
+  reviewState.open = false;
+  document.getElementById('review-overlay').classList.add('hidden');
+  updateButtons();
+  startRaf();
+}
+
+function stepReview(delta) {
+  if (!reviewState.open) return;
+  const next = Math.max(0, Math.min(moveHistory.length - 1, reviewState.index + delta));
+  if (next === reviewState.index) return;
+  reviewState.index = next;
+  updateReviewUI();
+  startRaf();
+}
+
+function handleReviewOverlayClick(event) {
+  if (event.target === event.currentTarget) {
+    closeReview();
+  }
+}
+
+function applyState(data, options = {}) {
   const prev = state;
+  const action = options.action || 'state';
   state = data;
 
+  if (action === 'new' || !prev) {
+    moveHistory = [cloneBoard(data.board)];
+  } else if (action === 'move' && data.ok) {
+    appendMoveSnapshots(prev, data, options.moveRow, options.moveCol);
+  } else if (action === 'undo' && data.ok) {
+    syncHistoryAfterUndo(data.board, data.moveCount);
+  }
+
+  if (action === 'new' || action === 'move' || (action === 'undo' && data.ok)) {
+    hintPos = null;
+  }
+
   dropFrames = [];
-  if (prev) {
-    for (let r = 0; r < SIZE; r++) {
-      for (let c = 0; c < SIZE; c++) {
-        if (prev.board[r][c] === 0 && data.board[r][c] !== 0) {
-          dropFrames.push({ row: r, col: c, stone: data.board[r][c], t: 0 });
-        }
-      }
-    }
+  if (prev && !reviewState.open) {
+    const diffs = findDiffs(prev.board, data.board);
+    dropFrames = diffs.map(diff => ({ row: diff.row, col: diff.col, stone: diff.value, t: 0 }));
   }
 
   pulseFrames = [];
-  if (data.lastRow >= 0) {
+  if (!reviewState.open && data.lastRow >= 0) {
     pulseFrames.push({ row: data.lastRow, col: data.lastCol, t: 0 });
   }
 
+  if (!data.gameOver) {
+    hideResult();
+    clearResultTimer();
+  }
+
   updateStatus(data);
+  updateButtons();
+  updateReviewUI();
+
+  if (action === 'new' && data.ok) {
+    setFlash(data.message || '新对局已创建');
+  } else if (action === 'undo' || !data.ok) {
+    setFlash(data.message || '');
+  } else {
+    setFlash('', 0);
+  }
+
   startRaf();
+}
+
+function appendMoveSnapshots(prev, data, moveRow, moveCol) {
+  const diffs = findDiffs(prev.board, data.board);
+  if (diffs.length === 0) return;
+
+  if (prev.mode === 'ai' && diffs.length === 2 && Number.isInteger(moveRow) && Number.isInteger(moveCol)) {
+    const midBoard = cloneBoard(prev.board);
+    midBoard[moveRow][moveCol] = prev.currentPlayer;
+    pushHistoryBoard(midBoard);
+    pushHistoryBoard(cloneBoard(data.board));
+    return;
+  }
+
+  pushHistoryBoard(cloneBoard(data.board));
+}
+
+function syncHistoryAfterUndo(board, moveCount) {
+  const targetLength = Math.max(1, moveCount + 1);
+  moveHistory = moveHistory.slice(0, targetLength);
+  if (moveHistory.length === 0) {
+    moveHistory = [cloneBoard(board)];
+  } else {
+    moveHistory[moveHistory.length - 1] = cloneBoard(board);
+  }
+}
+
+function pushHistoryBoard(board) {
+  const last = moveHistory[moveHistory.length - 1];
+  if (!last || !boardsEqual(last, board)) {
+    moveHistory.push(board);
+  }
 }
 
 function updateStatus(data) {
   const el = document.getElementById('status-text');
   if (data.gameOver) {
     el.textContent = data.winner === 0 ? '平局' : (data.winner === 1 ? '黑子获胜' : '白子获胜');
-    setTimeout(() => showResult(data.winner), 400);
+    clearResultTimer();
+    resultTimer = window.setTimeout(() => {
+      if (state && state.gameOver && !reviewState.open) {
+        showResult(state.winner);
+      }
+    }, 400);
+    return;
+  }
+
+  clearResultTimer();
+  if (data.mode === 'ai' && data.currentPlayer === 2) {
+    el.textContent = 'AI 思考中';
   } else {
     const player = data.currentPlayer === 1 ? '黑子' : '白子';
-    el.textContent = (data.mode === 'ai' && data.currentPlayer === 2) ? 'AI 思考中…' : `当前：${player}`;
+    el.textContent = `当前轮到：${player}`;
   }
 }
-
-// ── Result overlay ─────────────────────────────────────────────
 
 function showResult(winner) {
   const overlay = document.getElementById('result-overlay');
-  const icon    = document.getElementById('result-icon');
-  const title   = document.getElementById('result-title');
-  const sub     = document.getElementById('result-sub');
+  const icon = document.getElementById('result-icon');
+  const title = document.getElementById('result-title');
+  const sub = document.getElementById('result-sub');
 
   if (winner === 0) {
-    icon.className = 'result-icon draw'; icon.textContent = '◈';
-    title.textContent = '平局'; sub.textContent = '势均力敌，再分高下！';
+    icon.className = 'result-icon draw';
+    icon.textContent = '●';
+    title.textContent = '平局';
+    sub.textContent = '这一局势均力敌。';
   } else {
-    icon.className = `result-icon ${winner === 1 ? 'black' : 'white'}`; icon.textContent = '●';
-    title.textContent = winner === 1 ? '黑子获胜' : '白子获胜'; sub.textContent = '五子连珠！';
+    icon.className = `result-icon ${winner === 1 ? 'black' : 'white'}`;
+    icon.textContent = '●';
+    title.textContent = winner === 1 ? '黑子获胜' : '白子获胜';
+    sub.textContent = '你可以直接开始终局复盘。';
   }
 
   overlay.classList.remove('hidden');
-  const card = overlay.querySelector('.result-card');
-  card.style.animation = 'none'; void card.offsetWidth; card.style.animation = '';
 }
 
-function hideResult() { document.getElementById('result-overlay').classList.add('hidden'); }
-function handleOverlayClick(e) { if (e.target === e.currentTarget) hideResult(); }
-function restartGame() { hideResult(); startGame(currentMode, currentDiff); }
+function hideResult() {
+  document.getElementById('result-overlay').classList.add('hidden');
+}
 
-// ── Loading ────────────────────────────────────────────────────
+function handleOverlayClick(event) {
+  if (event.target === event.currentTarget) {
+    hideResult();
+  }
+}
+
+function restartGame() {
+  hideResult();
+  startGame(currentMode, currentDiff);
+}
+
+function clearResultTimer() {
+  if (resultTimer) {
+    clearTimeout(resultTimer);
+    resultTimer = null;
+  }
+}
 
 function setLoading(on) {
   busy = on;
-  canvas.classList.toggle('locked', on);
+  canvas.classList.toggle('locked', on || reviewState.open);
   document.getElementById('thinking-overlay').classList.toggle('hidden', !on);
+  updateButtons();
 }
 
-// ── Drawing ────────────────────────────────────────────────────
+function setFlash(message, timeout = 2200) {
+  const el = document.getElementById('action-message');
+  el.textContent = message || '';
+  if (flashTimer) {
+    clearTimeout(flashTimer);
+    flashTimer = null;
+  }
+  if (message && timeout > 0) {
+    flashTimer = window.setTimeout(() => {
+      el.textContent = '';
+      flashTimer = null;
+    }, timeout);
+  }
+}
+
+function updateButtons() {
+  const undoBtn = document.getElementById('undo-btn');
+  const hintBtn = document.getElementById('hint-btn');
+  const reviewBtn = document.getElementById('review-btn');
+
+  const canUndo = !!state && !busy && !reviewState.open && !state.gameOver && state.histCount > 0;
+  const canHint = !!state && !busy && !reviewState.open && isHumanTurn(state);
+  const canReview = !!state && !busy && !reviewState.open && state.gameOver && moveHistory.length > 1;
+
+  undoBtn.disabled = !canUndo;
+  hintBtn.disabled = !canHint;
+  reviewBtn.disabled = !canReview;
+}
+
+function updateReviewUI() {
+  const stepEl = document.getElementById('review-step');
+  const prevBtn = document.getElementById('review-prev-btn');
+  const nextBtn = document.getElementById('review-next-btn');
+
+  if (!reviewState.open) {
+    stepEl.textContent = '';
+    prevBtn.disabled = true;
+    nextBtn.disabled = true;
+    return;
+  }
+
+  const totalMoves = Math.max(0, moveHistory.length - 1);
+  stepEl.textContent = `第 ${reviewState.index} 手 / 共 ${totalMoves} 手`;
+  prevBtn.disabled = reviewState.index <= 0;
+  nextBtn.disabled = reviewState.index >= moveHistory.length - 1;
+}
+
+function isHumanTurn(data) {
+  if (!data || data.gameOver) return false;
+  return data.mode === 'pvp' || data.currentPlayer === 1;
+}
+
+function cloneBoard(board) {
+  return board.map(row => row.slice());
+}
+
+function boardsEqual(a, b) {
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      if (a[r][c] !== b[r][c]) return false;
+    }
+  }
+  return true;
+}
+
+function findDiffs(prevBoard, nextBoard) {
+  const diffs = [];
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      if (prevBoard[r][c] !== nextBoard[r][c]) {
+        diffs.push({ row: r, col: c, value: nextBoard[r][c] });
+      }
+    }
+  }
+  return diffs;
+}
+
+function getDisplayedBoard() {
+  if (reviewState.open) {
+    return moveHistory[reviewState.index] || (state ? state.board : null);
+  }
+  return state ? state.board : null;
+}
+
+function getDisplayedLastMove() {
+  if (reviewState.open) {
+    if (reviewState.index <= 0) return null;
+    const prev = moveHistory[reviewState.index - 1];
+    const next = moveHistory[reviewState.index];
+    const diffs = findDiffs(prev, next);
+    return diffs.length > 0 ? diffs[0] : null;
+  }
+
+  if (state && state.lastRow >= 0) {
+    return { row: state.lastRow, col: state.lastCol };
+  }
+  return null;
+}
 
 function cx(col) { return PAD + col * CELL; }
 function cy(row) { return PAD + row * CELL; }
 
-function drawBoard() {
-  ctx.fillStyle = '#c19a49';
-  ctx.fillRect(0, 0, BOARD_PX, BOARD_PX);
+function drawBoardSurface(context) {
+  context.fillStyle = '#c19a49';
+  context.fillRect(0, 0, BOARD_PX, BOARD_PX);
 
-  ctx.strokeStyle = '#9a7530';
-  ctx.lineWidth = 1;
+  context.strokeStyle = '#9a7530';
+  context.lineWidth = 1;
   for (let i = 0; i < SIZE; i++) {
-    ctx.beginPath(); ctx.moveTo(cx(0), cy(i)); ctx.lineTo(cx(SIZE-1), cy(i)); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cx(i), cy(0)); ctx.lineTo(cx(i), cy(SIZE-1)); ctx.stroke();
+    context.beginPath();
+    context.moveTo(cx(0), cy(i));
+    context.lineTo(cx(SIZE - 1), cy(i));
+    context.stroke();
+
+    context.beginPath();
+    context.moveTo(cx(i), cy(0));
+    context.lineTo(cx(i), cy(SIZE - 1));
+    context.stroke();
   }
 
-  const stars = [[3,3],[3,11],[7,7],[11,3],[11,11]];
-  ctx.fillStyle = '#7a5c20';
-  stars.forEach(([r,c]) => {
-    ctx.beginPath(); ctx.arc(cx(c), cy(r), 3, 0, Math.PI*2); ctx.fill();
+  const stars = [[3, 3], [3, 11], [7, 7], [11, 3], [11, 11]];
+  context.fillStyle = '#7a5c20';
+  stars.forEach(([row, col]) => {
+    context.beginPath();
+    context.arc(cx(col), cy(row), 3, 0, Math.PI * 2);
+    context.fill();
   });
 }
 
-function drawStone(row, col, stone, scale) {
-  const x = cx(col), y = cy(row);
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(scale, scale);
-  const grad = ctx.createRadialGradient(-RADIUS*0.3, -RADIUS*0.3, 1, 0, 0, RADIUS);
-  if (stone === 1) { grad.addColorStop(0, '#555'); grad.addColorStop(1, '#111'); }
-  else             { grad.addColorStop(0, '#fff'); grad.addColorStop(1, '#d0ccc8'); }
-  ctx.beginPath(); ctx.arc(0, 0, RADIUS, 0, Math.PI*2);
-  ctx.fillStyle = grad;
-  ctx.shadowColor = 'rgba(0,0,0,.4)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
-  ctx.fill();
-  ctx.restore();
+function drawStone(context, row, col, stone, scale) {
+  const x = cx(col);
+  const y = cy(row);
+  context.save();
+  context.translate(x, y);
+  context.scale(scale, scale);
+
+  const grad = context.createRadialGradient(-RADIUS * 0.3, -RADIUS * 0.3, 1, 0, 0, RADIUS);
+  if (stone === 1) {
+    grad.addColorStop(0, '#555');
+    grad.addColorStop(1, '#111');
+  } else {
+    grad.addColorStop(0, '#fff');
+    grad.addColorStop(1, '#d0ccc8');
+  }
+
+  context.beginPath();
+  context.arc(0, 0, RADIUS, 0, Math.PI * 2);
+  context.fillStyle = grad;
+  context.shadowColor = 'rgba(0,0,0,.4)';
+  context.shadowBlur = 6;
+  context.shadowOffsetY = 2;
+  context.fill();
+  context.restore();
 }
 
-function drawLastMark(row, col) {
-  const x = cx(col), y = cy(row), s = 6;
-  ctx.fillStyle = 'rgba(212,168,67,0.85)';
-  ctx.fillRect(x - s/2, y - s/2, s, s);
+function drawLastMark(context, row, col) {
+  const x = cx(col);
+  const y = cy(row);
+  const size = 6;
+  context.fillStyle = 'rgba(212, 168, 67, 0.88)';
+  context.fillRect(x - size / 2, y - size / 2, size, size);
 }
 
-function drawPulse(row, col, t) {
-  const x = cx(col), y = cy(row);
-  const r = RADIUS + t * 14;
+function drawPulse(context, row, col, t) {
+  const x = cx(col);
+  const y = cy(row);
+  const radius = RADIUS + t * 14;
   const alpha = (1 - t) * 0.6;
-  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2);
-  ctx.strokeStyle = `rgba(212,168,67,${alpha})`; ctx.lineWidth = 2; ctx.stroke();
+  context.beginPath();
+  context.arc(x, y, radius, 0, Math.PI * 2);
+  context.strokeStyle = `rgba(212, 168, 67, ${alpha})`;
+  context.lineWidth = 2;
+  context.stroke();
+}
+
+function drawHintMark(context, row, col) {
+  const x = cx(col);
+  const y = cy(row);
+  context.beginPath();
+  context.arc(x, y, RADIUS + 5, 0, Math.PI * 2);
+  context.strokeStyle = 'rgba(90, 220, 190, 0.85)';
+  context.lineWidth = 2;
+  context.stroke();
+
+  context.beginPath();
+  context.arc(x, y, 4, 0, Math.PI * 2);
+  context.fillStyle = 'rgba(90, 220, 190, 0.35)';
+  context.fill();
 }
 
 function render() {
   rafId = null;
   ctx.clearRect(0, 0, BOARD_PX, BOARD_PX);
-  drawBoard();
+  drawBoardSurface(ctx);
 
-  if (!state) return;
+  const board = getDisplayedBoard();
+  if (!board) return;
 
-  const DT = 1/60;
-  const DROP_DUR = 0.18;
-  const PULSE_DUR = 1.2;
+  const animating = new Set();
+  if (!reviewState.open) {
+    dropFrames.forEach(frame => animating.add(`${frame.row},${frame.col}`));
+  }
 
-  const animating = new Set(dropFrames.map(f => `${f.row},${f.col}`));
   for (let r = 0; r < SIZE; r++) {
     for (let c = 0; c < SIZE; c++) {
-      if (state.board[r][c] !== 0 && !animating.has(`${r},${c}`)) {
-        drawStone(r, c, state.board[r][c], 1);
+      if (board[r][c] !== 0 && !animating.has(`${r},${c}`)) {
+        drawStone(ctx, r, c, board[r][c], 1);
       }
     }
   }
 
-  if (state.lastRow >= 0 && dropFrames.length === 0) drawLastMark(state.lastRow, state.lastCol);
+  const lastMove = getDisplayedLastMove();
+  if (lastMove && (reviewState.open || dropFrames.length === 0)) {
+    drawLastMark(ctx, lastMove.row, lastMove.col);
+  }
 
-  dropFrames = dropFrames.filter(f => {
-    f.t += DT / DROP_DUR;
-    const t = Math.min(f.t, 1);
-    const scale = 1 + (t-1)*(t-1)*((1.7+1)*(t-1)+1.7);
-    drawStone(f.row, f.col, f.stone, Math.max(0.01, scale));
-    return f.t < 1;
+  if (!reviewState.open && hintPos && board[hintPos.row][hintPos.col] === 0) {
+    drawHintMark(ctx, hintPos.row, hintPos.col);
+  }
+
+  if (reviewState.open) return;
+
+  const dt = 1 / 60;
+  const dropDuration = 0.18;
+  const pulseDuration = 1.2;
+
+  dropFrames = dropFrames.filter(frame => {
+    frame.t += dt / dropDuration;
+    const t = Math.min(frame.t, 1);
+    const scale = 1 + (t - 1) * (t - 1) * ((1.7 + 1) * (t - 1) + 1.7);
+    drawStone(ctx, frame.row, frame.col, frame.stone, Math.max(0.01, scale));
+    return frame.t < 1;
   });
 
-  pulseFrames = pulseFrames.filter(f => {
-    f.t += DT / PULSE_DUR;
-    drawPulse(f.row, f.col, f.t % 1);
+  pulseFrames = pulseFrames.filter(frame => {
+    frame.t += dt / pulseDuration;
+    drawPulse(ctx, frame.row, frame.col, frame.t % 1);
     return true;
   });
 
@@ -271,23 +584,22 @@ function startRaf() {
   rafId = requestAnimationFrame(render);
 }
 
-// ── Click handling ─────────────────────────────────────────────
-
-canvas.addEventListener('click', e => {
-  if (busy || !state || state.gameOver) return;
+canvas.addEventListener('click', event => {
+  if (busy || !state || state.gameOver || reviewState.open) return;
   if (state.mode === 'ai' && state.currentPlayer !== 1) return;
 
   const rect = canvas.getBoundingClientRect();
   const scaleX = BOARD_PX / rect.width;
   const scaleY = BOARD_PX / rect.height;
-  const px = (e.clientX - rect.left) * scaleX;
-  const py = (e.clientY - rect.top)  * scaleY;
+  const px = (event.clientX - rect.left) * scaleX;
+  const py = (event.clientY - rect.top) * scaleY;
 
   const col = Math.round((px - PAD) / CELL);
   const row = Math.round((py - PAD) / CELL);
-  if (col < 0 || col >= SIZE || row < 0 || row >= SIZE) return;
+  if (row < 0 || row >= SIZE || col < 0 || col >= SIZE) return;
 
   doMove(row, col);
 });
 
-drawBoard();
+drawBoardSurface(ctx);
+updateButtons();

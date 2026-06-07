@@ -152,17 +152,41 @@ class GameState {
         if (this.moveCount == 0) {
             return Array<Point>(1, { _ => Point(CENTER, CENTER) })
         }
-        var result = Array<Point>(BOARD_SIZE * BOARD_SIZE, { _ => Point(0, 0) })
+        let MAX_CANDS: Int64 = 20
+        var cRows   = Array<Int64>(BOARD_SIZE * BOARD_SIZE, repeat: 0)
+        var cCols   = Array<Int64>(BOARD_SIZE * BOARD_SIZE, repeat: 0)
+        var cScores = Array<Int64>(BOARD_SIZE * BOARD_SIZE, repeat: 0)
         var count: Int64 = 0
         for (row in 0..BOARD_SIZE) {
             for (col in 0..BOARD_SIZE) {
                 if (this.board[row][col] != 0) { continue }
                 if (!this.hasNearbyStone(row, col, 2)) { continue }
-                result[count] = Point(row, col)
+                let a = this.pointScore(row, col, 2)
+                let d = this.pointScore(row, col, 1)
+                var s: Int64 = a * 2 + d
+                if (a >= 100000)      { s = 2_000_000 }
+                else if (d >= 100000) { s = 1_500_000 }
+                cRows[count] = row; cCols[count] = col; cScores[count] = s
                 count += 1
             }
         }
-        return result[0..count]
+        // 插入排序（降序），让 alpha-beta 从最优候选开始搜索
+        var i: Int64 = 1
+        while (i < count) {
+            let kr = cRows[i]; let kc = cCols[i]; let ks = cScores[i]
+            var j = i - 1
+            while (j >= 0 && cScores[j] < ks) {
+                cRows[j + 1] = cRows[j]; cCols[j + 1] = cCols[j]; cScores[j + 1] = cScores[j]
+                j -= 1
+            }
+            cRows[j + 1] = kr; cCols[j + 1] = kc; cScores[j + 1] = ks
+            i += 1
+        }
+        let n = if (count < MAX_CANDS) { count } else { MAX_CANDS }
+        var result = Array<Point>(n, { _ => Point(0, 0) })
+        var k: Int64 = 0
+        while (k < n) { result[k] = Point(cRows[k], cCols[k]); k += 1 }
+        return result
     }
 
     func chooseGreedy(): Point {

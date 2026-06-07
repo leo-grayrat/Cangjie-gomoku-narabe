@@ -137,8 +137,12 @@ class GameState {
         for (row in 0..BOARD_SIZE) {
             for (col in 0..BOARD_SIZE) {
                 let v = this.board[row][col]
-                if (v == 2)      { score += this.pointScore(row, col, 2) }
-                else if (v == 1) { score -= this.pointScore(row, col, 1) }
+                if (v == 0) { continue }
+                // 临时移除棋子，让 pointScore 能统计该位置的棋型价值
+                this.board[row][col] = 0
+                let s = this.pointScore(row, col, v)
+                this.board[row][col] = v
+                if (v == 2) { score += s } else { score -= s }
             }
         }
         return score
@@ -240,7 +244,7 @@ class GameState {
             this.moveCount += 1
             if (this.hasFive(p.row, p.col, 2)) { this.gameOver = true; this.winner = 2 }
             this.currentPlayer = 1
-            let v = this.minimax(2, false)
+            let v = this.minimax(3, false)
             this.board[p.row][p.col] = 0; this.gameOver = prevOver; this.winner = prevWinner
             this.currentPlayer = prevPlayer; this.moveCount -= 1
             if (v > best) { best = v; bestRow = p.row; bestCol = p.col }

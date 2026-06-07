@@ -1,6 +1,7 @@
 package Gomoku_narabe
 
 import std.random.*
+import std.convert.*
 
 class GameState {
     var board: Array<Array<Int64>> = emptyBoard()
@@ -503,80 +504,140 @@ class GameState {
         return this.chooseAlphaBetaN(4, 20)
     }
 
-    // --- Joseki: center opening book, then fall back to hard ---
+    // --- Joseki: opening book with symmetry matching, then fall back to hard ---
 
-    func josekiBlackAt(dr: Int64, dc: Int64): Bool {
-        let row = CENTER + dr
-        let col = CENTER + dc
-        return this.isInside(row, col) && this.board[row][col] == 1
+    func josekiBookLines(): Array<String> {
+        // Based on common Renju/Gomoku opening families. One line encodes:
+        // black 1; white 2; black 3; white 4; ...
+        var lines = Array<String>(30, repeat: "")
+
+        // Direct openings: white answers orthogonally to the center.
+        lines[0] = "0,0;-1,0;-2,0;-1,1;-2,1;-1,2"
+        lines[1] = "0,0;-1,0;-2,1;-1,-1;-2,-1;-1,-2"
+        lines[2] = "0,0;-1,0;-2,2;-1,1"
+        lines[3] = "0,0;-1,0;-1,1;0,1"
+        lines[4] = "0,0;-1,0;-1,2;-2,1"
+        lines[5] = "0,0;-1,0;0,1;-2,1"
+        lines[6] = "0,0;-1,0;0,2;-1,1"
+        lines[7] = "0,0;-1,0;1,0;0,1"
+        lines[8] = "0,0;-1,0;1,1;-1,-1"
+        lines[9] = "0,0;-1,0;1,2;0,1"
+        lines[10] = "0,0;-1,0;2,0;1,1"
+        lines[11] = "0,0;-1,0;2,1;1,0"
+        lines[12] = "0,0;-1,0;2,2;1,1"
+
+        // Indirect openings: white answers diagonally to the center.
+        lines[13] = "0,0;-1,1;-2,1;-1,0;-2,0;-1,-1"
+        lines[14] = "0,0;-1,1;-2,2;0,1"
+        lines[15] = "0,0;-1,1;-1,2;0,1"
+        lines[16] = "0,0;-1,1;0,2;-1,0"
+        lines[17] = "0,0;-1,1;1,2;0,1"
+        lines[18] = "0,0;-1,1;0,1;-2,1"
+        lines[19] = "0,0;-1,1;1,1;0,2"
+        lines[20] = "0,0;-1,1;1,0;-1,-1"
+        lines[21] = "0,0;-1,1;2,0;1,1"
+        lines[22] = "0,0;-1,1;1,-1;0,1"
+        lines[23] = "0,0;-1,1;2,-1;1,0"
+        lines[24] = "0,0;-1,1;2,-2;1,-1"
+        lines[25] = "0,0;-1,1;1,-2;0,-1"
+
+        // Extra continuations for a few common center-opening lines.
+        lines[26] = "0,0;-1,0;-2,0;-1,1;-2,1;-1,2;0,2;-2,2"
+        lines[27] = "0,0;-1,0;1,1;-1,-1;0,-1;-2,-1"
+        lines[28] = "0,0;-1,1;-2,1;-1,0;-2,0;-1,-1;0,-1;-2,-2"
+        lines[29] = "0,0;-1,1;1,0;-1,-1;0,-1;-2,0"
+        return lines
     }
 
-    func josekiEmptyAt(dr: Int64, dc: Int64): Bool {
-        let row = CENTER + dr
-        let col = CENTER + dc
-        return this.isInside(row, col) && this.board[row][col] == 0
+    func parseJosekiLine(line: String): Array<Point> {
+        let tokens = line.split(";")
+        var points = Array<Point>(tokens.size, { _ => Point(0, 0) })
+        var i: Int64 = 0
+        while (i < tokens.size) {
+            let pair = tokens[i].split(",")
+            let row = match (Int64.tryParse(pair[0])) {
+                case Some(v) => v
+                case None => 0
+            }
+            let col = match (Int64.tryParse(pair[1])) {
+                case Some(v) => v
+                case None => 0
+            }
+            points[i] = Point(row, col)
+            i += 1
+        }
+        return points
     }
 
-    func lookupJoseki(): Int64 {
-        let mc = this.moveCount
-        if (!this.josekiBlackAt(0, 0)) { return -999 }
+    func transformJosekiPoint(p: Point, transform: Int64): Point {
+        if (transform == 0) { return Point(p.row, p.col) }
+        if (transform == 1) { return Point(p.col, -p.row) }
+        if (transform == 2) { return Point(-p.row, -p.col) }
+        if (transform == 3) { return Point(-p.col, p.row) }
+        if (transform == 4) { return Point(p.row, -p.col) }
+        if (transform == 5) { return Point(-p.col, -p.row) }
+        if (transform == 6) { return Point(-p.row, p.col) }
+        return Point(p.col, p.row)
+    }
 
-        if (mc == 1) {
-            if (this.josekiEmptyAt(0, 2)) { return 2 }
-            return -999
+    func josekiPrefixMatches(points: Array<Point>, prefixLen: Int64, transform: Int64): Bool {
+        if (points.size < prefixLen) { return false }
+        var i: Int64 = 0
+        while (i < prefixLen) {
+            let rel = this.transformJosekiPoint(points[i], transform)
+            let row = CENTER + rel.row
+            let col = CENTER + rel.col
+            if (!this.isInside(row, col)) { return false }
+            let expectedStone = if (i % 2 == 0) { 1 } else { 2 }
+            if (this.board[row][col] != expectedStone) { return false }
+            i += 1
+        }
+        return true
+    }
+
+    func josekiBookMove(): Point {
+        let lines = this.josekiBookLines()
+        var rows = Array<Int64>(64, repeat: 0)
+        var cols = Array<Int64>(64, repeat: 0)
+        var count: Int64 = 0
+
+        for (line in lines) {
+            let points = this.parseJosekiLine(line)
+            if (points.size <= this.moveCount) { continue }
+
+            for (transform in 0..8) {
+                if (!this.josekiPrefixMatches(points, this.moveCount, transform)) { continue }
+
+                let rel = this.transformJosekiPoint(points[this.moveCount], transform)
+                let row = CENTER + rel.row
+                let col = CENTER + rel.col
+                if (!this.isInside(row, col) || this.board[row][col] != 0) { continue }
+
+                var exists = false
+                var i: Int64 = 0
+                while (i < count) {
+                    if (rows[i] == row && cols[i] == col) {
+                        exists = true
+                        break
+                    }
+                    i += 1
+                }
+                if (!exists) {
+                    rows[count] = row
+                    cols[count] = col
+                    count += 1
+                }
+            }
         }
 
-        if (mc == 3) {
-            if (this.josekiBlackAt(0, -1) && this.board[CENTER][CENTER + 2] == 2 && this.josekiEmptyAt(0, -2)) {
-                return -200
-            }
-            if (this.josekiBlackAt(1, 0) && this.board[CENTER][CENTER + 2] == 2 && this.josekiEmptyAt(2, 0)) {
-                return 200
-            }
-            if (this.josekiBlackAt(1, 1) && this.board[CENTER][CENTER + 2] == 2 && this.josekiEmptyAt(-1, -1)) {
-                return -101
-            }
-        }
-
-        if (mc == 5) {
-            if (this.josekiBlackAt(0, -1) && this.josekiBlackAt(0, -2)
-                && this.board[CENTER][CENTER + 2] == 2
-                && this.board[CENTER][CENTER + 3] == 2
-                && this.josekiEmptyAt(0, 4)) {
-                return 4
-            }
-            if (this.josekiBlackAt(1, 1) && this.josekiBlackAt(2, 2)
-                && this.board[CENTER - 1][CENTER - 1] == 2
-                && this.board[CENTER - 2][CENTER - 2] == 2
-                && this.josekiEmptyAt(3, 3)) {
-                return 303
-            }
-        }
-
-        return -999
+        if (count == 0) { return Point(-1, -1) }
+        let pick = this.rng.nextInt64(count)
+        return Point(rows[pick], cols[pick])
     }
 
     func chooseJoseki(): Point {
-        let code = this.lookupJoseki()
-        if (code != -999) {
-            var dr: Int64 = code / 100
-            var dc: Int64 = code % 100
-            if (code < 0) {
-                dr = -((-code) / 100)
-                dc = -((-code) % 100)
-                if (code == -101) { dr = -1; dc = -1 }
-                else if (code == -200) { dr = -2; dc = 0 }
-            }
-            if (code == 2) { dr = 0; dc = 2 }
-            if (code == 4) { dr = 0; dc = 4 }
-            if (code == 200) { dr = 2; dc = 0 }
-            if (code == 303) { dr = 3; dc = 3 }
-            let row = CENTER + dr
-            let col = CENTER + dc
-            if (this.isInside(row, col) && this.board[row][col] == 0) {
-                return Point(row, col)
-            }
-        }
+        let bookMove = this.josekiBookMove()
+        if (bookMove.row >= 0) { return bookMove }
         return this.chooseAlphaBetaN(4, 15)
     }
 

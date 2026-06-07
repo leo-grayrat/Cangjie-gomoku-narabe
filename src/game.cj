@@ -13,6 +13,9 @@ class GameState {
     var lastRow: Int64 = -1
     var lastCol: Int64 = -1
     var rng: Random = Random()
+    var histBoards: Array<Array<Array<Int64>>> = Array<Array<Array<Int64>>>(226, { _ => emptyBoard() })
+    var histPlayers: Array<Int64> = Array<Int64>(226, repeat: 0)
+    var histCount: Int64 = 0
 
     func reset(newMode: String, newDiff: String) {
         this.board = emptyBoard()
@@ -24,6 +27,7 @@ class GameState {
         this.lastCol = -1
         this.mode = if (newMode == "ai") { "ai" } else { "pvp" }
         this.difficulty = newDiff
+        this.histCount = 0
     }
 
     func isInside(row: Int64, col: Int64): Bool {
@@ -481,13 +485,52 @@ class GameState {
 
     // --- Player API ---
 
+    func undo(): ApiResult {
+        if (this.histCount == 0) { return ApiResult(false, "没有可悔棋的步骤") }
+        if (this.gameOver) { return ApiResult(false, "对局已结束，请通过复盘查看") }
+        let stepsToUndo = if (this.mode == "ai" && this.histCount >= 2) { 2 } else { 1 }
+        let target = this.histCount - stepsToUndo
+        let savedBoard = this.histBoards[target]
+        for (r in 0..BOARD_SIZE) {
+            for (c in 0..BOARD_SIZE) {
+                this.board[r][c] = savedBoard[r][c]
+            }
+        }
+        this.currentPlayer = this.histPlayers[target]
+        this.histCount = target
+        this.moveCount -= stepsToUndo
+        this.lastRow = -1
+        this.lastCol = -1
+        this.gameOver = false
+        this.winner = 0
+        return ApiResult(true, "悔棋成功")
+    }
+
+    func hint(): Point {
+        let win = this.findWinningMove(this.currentPlayer)
+        if (win >= 0) { return Point(win / BOARD_SIZE, win % BOARD_SIZE) }
+        let block = this.findWinningMove(otherPlayer(this.currentPlayer))
+        if (block >= 0) { return Point(block / BOARD_SIZE, block % BOARD_SIZE) }
+        return this.chooseAlphaBetaN(4, 15)
+    }
+
     func playerMove(row: Int64, col: Int64): ApiResult {
         if (this.gameOver)              { return ApiResult(false, "游戏已经结束，请重新开始") }
         if (!this.isInside(row, col))   { return ApiResult(false, "坐标越界") }
         if (this.board[row][col] != 0)  { return ApiResult(false, "该位置已有棋子") }
         if (this.mode == "ai" && this.currentPlayer != 1) { return ApiResult(false, "请等待 AI 落子") }
+        // 保存快照
+        let snap = Array<Array<Int64>>(BOARD_SIZE, { r => Array<Int64>(BOARD_SIZE, { c => this.board[r][c] }) })
+        this.histBoards[this.histCount] = snap
+        this.histPlayers[this.histCount] = this.currentPlayer
+        this.histCount += 1
         this.placeCurrentStone(row, col)
         if (this.mode == "ai" && !this.gameOver && this.currentPlayer == 2) {
+            // 保存 AI 落子前快照
+            let snap2 = Array<Array<Int64>>(BOARD_SIZE, { r => Array<Int64>(BOARD_SIZE, { c => this.board[r][c] }) })
+            this.histBoards[this.histCount] = snap2
+            this.histPlayers[this.histCount] = 2
+            this.histCount += 1
             let ai = this.chooseAiMove()
             this.placeCurrentStone(ai.row, ai.col)
             return ApiResult(true, "你已落子，AI 已应手")

@@ -151,9 +151,10 @@ function openReview() {
     return;
   }
 
+  clearResultTimer();
+  hideResult();
   reviewState.open = true;
   reviewState.index = moveHistory.length - 1;
-  hideResult();
   document.getElementById('review-overlay').classList.remove('hidden');
   updateReviewUI();
   updateButtons();
@@ -161,6 +162,8 @@ function openReview() {
 }
 
 function closeReview() {
+  clearResultTimer();
+  hideResult();
   reviewState.open = false;
   document.getElementById('review-overlay').classList.add('hidden');
   updateButtons();
@@ -202,12 +205,18 @@ function applyState(data, options = {}) {
   dropFrames = [];
   if (prev && !reviewState.open) {
     const diffs = findDiffs(prev.board, data.board);
-    dropFrames = diffs.map(diff => ({ row: diff.row, col: diff.col, stone: diff.value, t: 0 }));
+    dropFrames = diffs
+      .filter(diff => diff.value !== 0)
+      .map(diff => ({ row: diff.row, col: diff.col, stone: diff.value, t: 0 }));
   }
 
   pulseFrames = [];
   if (!reviewState.open && data.lastRow >= 0) {
     pulseFrames.push({ row: data.lastRow, col: data.lastCol, t: 0 });
+  }
+
+  if (action === 'undo' && data.ok) {
+    pulseFrames = [];
   }
 
   if (!data.gameOver) {
@@ -285,6 +294,8 @@ function updateStatus(data) {
 }
 
 function showResult(winner) {
+  if (reviewState.open) return;
+
   const overlay = document.getElementById('result-overlay');
   const icon = document.getElementById('result-icon');
   const title = document.getElementById('result-title');

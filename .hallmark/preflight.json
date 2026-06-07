@@ -1,0 +1,20 @@
+{
+  "date": "2026-06-08",
+  "findings": {
+    "font_stack": "Local CJK serif + sans stacks in frontend tokens",
+    "palette": "Custom dark board-study palette with warm paper, brass, and lacquer accents",
+    "motion": "Vanilla CSS and canvas animation only; no motion library detected",
+    "spacing": "Custom semantic spacing scale",
+    "framework": "Vanilla HTML/CSS/JS served by Cangjie backend"
+  },
+  "preserve": [
+    "Single-page frontend architecture",
+    "Existing canvas board interaction model",
+    "Current game API endpoints"
+  ],
+  "introduce": [
+    "Editorial split home layout",
+    "Desk-style game surface with inline control column",
+    "Shared token file for frontend styling"
+  ]
+}

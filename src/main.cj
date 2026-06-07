@@ -42,6 +42,9 @@ func handleRequest(request: String): Array<Byte> {
     if (path == "/style.css") {
         return serveFile("frontend/style.css", "text/css; charset=utf-8")
     }
+    if (path == "/tokens.css") {
+        return serveFile("tokens.css", "text/css; charset=utf-8")
+    }
     if (path == "/app.js") {
         return serveFile("frontend/app.js", "application/javascript; charset=utf-8")
     }

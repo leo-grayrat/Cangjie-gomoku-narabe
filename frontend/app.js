@@ -6,12 +6,22 @@ const PAD = 22;
 const RADIUS = 14;
 const BOARD_PX = PAD * 2 + CELL * (SIZE - 1);
 
-const ALGO_NAMES = {
-  easy: '人机 · Easy',
-  medium: '人机 · Medium',
-  hard: '人机 · Hard',
-  expert: '人机 · Expert',
-  joseki: '人机 · Joseki'
+const MODE_TEXT = {
+  pvp: '本地双人',
+  easy: '人机对战 · Easy',
+  medium: '人机对战 · Medium',
+  hard: '人机对战 · Hard',
+  expert: '人机对战 · Expert',
+  joseki: '人机对战 · Joseki'
+};
+
+const TABLE_NOTE = {
+  pvp: '两位玩家轮流落子，系统只负责规则、悔棋与复盘。',
+  easy: '这一档先看眼前最划算的点，更像直觉型下法。',
+  medium: '这一档会预想你来我往的应手，是标准的 Minimax 思路。',
+  hard: '这一档会更稳地筛掉无效变化，把注意力放在关键攻防上。',
+  expert: '这一档会先检查一步胜负与紧急威胁，再进入整体推演。',
+  joseki: '这一档的特色在开局，先走定式味更强，出库后再回到实战判断。'
 };
 
 let state = null;
@@ -29,20 +39,28 @@ let resultTimer = null;
 
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
+
 canvas.width = BOARD_PX;
 canvas.height = BOARD_PX;
 
 function showView(id) {
-  document.querySelectorAll('.view').forEach(view => view.classList.remove('active', 'slide-in'));
+  document.querySelectorAll('.view').forEach((view) => {
+    view.classList.remove('active', 'slide-in');
+  });
   const target = document.getElementById(id);
   target.classList.add('active', 'slide-in');
 }
 
-function toggleDiffPanel() {
+function setDiffPanel(open) {
   const panel = document.getElementById('diff-panel');
   const chevron = document.getElementById('diff-chevron');
-  const open = panel.classList.toggle('open');
+  panel.classList.toggle('open', open);
   chevron.classList.toggle('rotated', open);
+}
+
+function toggleDiffPanel() {
+  const panel = document.getElementById('diff-panel');
+  setDiffPanel(!panel.classList.contains('open'));
 }
 
 function goHome() {
@@ -59,27 +77,34 @@ async function startGame(mode, diff) {
   currentMode = mode;
   currentDiff = diff;
   hintPos = null;
+  moveHistory = [];
+  setDiffPanel(false);
+  clearResultTimer();
   hideResult();
   closeReview();
-  clearResultTimer();
   setFlash('', 0);
   showView('view-game');
 
-  document.getElementById('mode-label').textContent =
-    mode === 'pvp' ? '本地双人' : (ALGO_NAMES[diff] || diff);
+  const key = mode === 'pvp' ? 'pvp' : diff;
+  document.getElementById('mode-label').textContent = MODE_TEXT[key] || key;
+  document.getElementById('table-note').textContent = TABLE_NOTE[key] || TABLE_NOTE.easy;
   showAlgoDetail(mode, diff);
 
   setLoading(true);
   try {
     const data = await api(`/api/new?mode=${mode}&diff=${diff}`);
     applyState(data, { action: 'new' });
+  } catch (error) {
+    setFlash('新对局没有成功建立，请稍后重试。');
   } finally {
     setLoading(false);
   }
 }
 
 function showAlgoDetail(mode, diff) {
-  document.querySelectorAll('.algo-detail-block').forEach(block => block.classList.remove('visible'));
+  document.querySelectorAll('.algo-detail-block').forEach((block) => {
+    block.classList.remove('visible');
+  });
   const key = mode === 'pvp' ? 'pvp' : diff;
   const target = document.querySelector(`.algo-detail-block[data-diff="${key}"]`);
   if (target) target.classList.add('visible');
@@ -87,6 +112,9 @@ function showAlgoDetail(mode, diff) {
 
 async function api(url) {
   const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
   return res.json();
 }
 
@@ -98,6 +126,8 @@ async function doMove(row, col) {
   try {
     const data = await api(`/api/move?row=${row}&col=${col}`);
     applyState(data, { action: 'move', moveRow: row, moveCol: col });
+  } catch (error) {
+    setFlash('这一手没有成功送到棋盘上。');
   } finally {
     setLoading(false);
   }
@@ -110,6 +140,8 @@ async function handleUndo() {
   try {
     const data = await api('/api/undo');
     applyState(data, { action: 'undo' });
+  } catch (error) {
+    setFlash('悔棋请求没有成功返回。');
   } finally {
     setLoading(false);
   }
@@ -124,12 +156,14 @@ async function handleHint() {
     const data = await api('/api/hint');
     if (data.ok) {
       hintPos = { row: data.row, col: data.col };
-      setFlash('已标出建议落点');
+      setFlash('建议落点已经标在棋盘上。');
       updateButtons();
       startRaf();
     } else {
-      setFlash(data.message || '当前无法提供帮助');
+      setFlash(data.message || '当前还不能请求帮助。');
     }
+  } catch (error) {
+    setFlash('帮助请求没有成功返回。');
   } finally {
     setLoading(false);
   }
@@ -137,12 +171,11 @@ async function handleHint() {
 
 function openReview() {
   if (!state || !state.gameOver || moveHistory.length <= 1) {
-    setFlash('终局后才能进入复盘');
+    setFlash('只有终局之后才能进入复盘。');
     return;
   }
 
   clearResultTimer();
-  hideResult();
   reviewState.open = true;
   reviewState.index = moveHistory.length - 1;
   document.getElementById('review-panel').classList.remove('hidden');
@@ -152,10 +185,9 @@ function openReview() {
 }
 
 function closeReview() {
-  clearResultTimer();
-  hideResult();
   reviewState.open = false;
   document.getElementById('review-panel').classList.add('hidden');
+  updateReviewUI();
   updateButtons();
   startRaf();
 }
@@ -182,30 +214,25 @@ function applyState(data, options = {}) {
     syncHistoryAfterUndo(data.board, data.moveCount);
   }
 
-  if (action === 'new' || action === 'move' || (action === 'undo' && data.ok)) {
+  if (action === 'new' || (data.ok && (action === 'move' || action === 'undo'))) {
     hintPos = null;
   }
 
   dropFrames = [];
   if (prev && !reviewState.open) {
-    const diffs = findDiffs(prev.board, data.board);
-    dropFrames = diffs
-      .filter(diff => diff.value !== 0)
-      .map(diff => ({ row: diff.row, col: diff.col, stone: diff.value, t: 0 }));
+    dropFrames = findDiffs(prev.board, data.board)
+      .filter((diff) => diff.value !== 0)
+      .map((diff) => ({ row: diff.row, col: diff.col, stone: diff.value, t: 0 }));
   }
 
   pulseFrames = [];
-  if (!reviewState.open && data.lastRow >= 0) {
+  if (!reviewState.open && action !== 'undo' && data.lastRow >= 0 && data.lastCol >= 0) {
     pulseFrames.push({ row: data.lastRow, col: data.lastCol, t: 0 });
   }
 
-  if (action === 'undo' && data.ok) {
-    pulseFrames = [];
-  }
-
   if (!data.gameOver) {
-    hideResult();
     clearResultTimer();
+    hideResult();
   }
 
   updateTurnIndicator(data);
@@ -213,9 +240,11 @@ function applyState(data, options = {}) {
   updateReviewUI();
 
   if (action === 'new' && data.ok) {
-    setFlash(data.message || '新对局已创建');
-  } else if (action === 'undo' || !data.ok) {
-    setFlash(data.message || '');
+    setFlash('新对局已经开始。');
+  } else if (action === 'undo') {
+    setFlash(data.ok ? '已回到上一个可继续落子的局面。' : (data.message || '当前没有可悔棋的步骤。'));
+  } else if (!data.ok) {
+    setFlash(data.message || '这一步暂时不能落下。');
   } else {
     setFlash('', 0);
   }
@@ -260,23 +289,25 @@ function updateTurnIndicator(data) {
   const text = document.getElementById('turn-text');
 
   stone.className = 'turn-stone';
+
   if (data.gameOver) {
     if (data.winner === 0) {
       stone.classList.add('white');
       text.textContent = '本局平局';
     } else if (data.winner === 1) {
       stone.classList.add('black');
-      text.textContent = '黑方胜出';
+      text.textContent = '黑子胜出';
     } else {
       stone.classList.add('white');
-      text.textContent = '白方胜出';
+      text.textContent = '白子胜出';
     }
+
     clearResultTimer();
     resultTimer = window.setTimeout(() => {
-      if (state && state.gameOver && !reviewState.open) {
+      if (state && state.gameOver) {
         showResult(state.winner);
       }
-    }, 400);
+    }, 240);
     return;
   }
 
@@ -289,48 +320,44 @@ function updateTurnIndicator(data) {
 
   if (data.currentPlayer === 1) {
     stone.classList.add('black');
-    text.textContent = '黑方回合';
+    text.textContent = '黑子落子';
   } else {
     stone.classList.add('white');
-    text.textContent = '白方回合';
+    text.textContent = '白子落子';
   }
 }
 
 function showResult(winner) {
-  if (reviewState.open) return;
-
-  const overlay = document.getElementById('result-overlay');
+  const panel = document.getElementById('result-panel');
   const icon = document.getElementById('result-icon');
   const title = document.getElementById('result-title');
   const sub = document.getElementById('result-sub');
 
   if (winner === 0) {
     icon.className = 'result-icon draw';
+    icon.textContent = '和';
+    title.textContent = '这一局收成平局';
+    sub.textContent = '如果想回头看双方怎么把局面推到这里，现在就可以进入复盘。';
+  } else if (winner === 1) {
+    icon.className = 'result-icon black';
     icon.textContent = '●';
-    title.textContent = '平局';
-    sub.textContent = '这一局势均力敌。';
+    title.textContent = '黑子赢下这一局';
+    sub.textContent = '终局已经固定，你可以立即复盘，也可以直接重开新局。';
   } else {
-    icon.className = `result-icon ${winner === 1 ? 'black' : 'white'}`;
+    icon.className = 'result-icon white';
     icon.textContent = '●';
-    title.textContent = winner === 1 ? '黑子获胜' : '白子获胜';
-    sub.textContent = '你可以直接开始终局复盘。';
+    title.textContent = '白子赢下这一局';
+    sub.textContent = '终局已经固定，你可以立即复盘，也可以直接重开新局。';
   }
 
-  overlay.classList.remove('hidden');
+  panel.classList.remove('hidden');
 }
 
 function hideResult() {
-  document.getElementById('result-overlay').classList.add('hidden');
-}
-
-function handleOverlayClick(event) {
-  if (event.target === event.currentTarget) {
-    hideResult();
-  }
+  document.getElementById('result-panel').classList.add('hidden');
 }
 
 function restartGame() {
-  hideResult();
   startGame(currentMode, currentDiff);
 }
 
@@ -375,6 +402,8 @@ function updateButtons() {
   undoBtn.disabled = !canUndo;
   hintBtn.disabled = !canHint;
   reviewBtn.disabled = !canReview;
+
+  canvas.classList.toggle('locked', busy || reviewState.open);
 }
 
 function updateReviewUI() {
@@ -401,12 +430,12 @@ function isHumanTurn(data) {
 }
 
 function cloneBoard(board) {
-  return board.map(row => row.slice());
+  return board.map((row) => row.slice());
 }
 
 function boardsEqual(a, b) {
-  for (let r = 0; r < SIZE; r++) {
-    for (let c = 0; c < SIZE; c++) {
+  for (let r = 0; r < SIZE; r += 1) {
+    for (let c = 0; c < SIZE; c += 1) {
       if (a[r][c] !== b[r][c]) return false;
     }
   }
@@ -415,8 +444,8 @@ function boardsEqual(a, b) {
 
 function findDiffs(prevBoard, nextBoard) {
   const diffs = [];
-  for (let r = 0; r < SIZE; r++) {
-    for (let c = 0; c < SIZE; c++) {
+  for (let r = 0; r < SIZE; r += 1) {
+    for (let c = 0; c < SIZE; c += 1) {
       if (prevBoard[r][c] !== nextBoard[r][c]) {
         diffs.push({ row: r, col: c, value: nextBoard[r][c] });
       }
@@ -437,26 +466,40 @@ function getDisplayedLastMove() {
     if (reviewState.index <= 0) return null;
     const prev = moveHistory[reviewState.index - 1];
     const next = moveHistory[reviewState.index];
-    const diffs = findDiffs(prev, next);
+    const diffs = findDiffs(prev, next).filter((diff) => diff.value !== 0);
     return diffs.length > 0 ? diffs[0] : null;
   }
 
-  if (state && state.lastRow >= 0) {
+  if (state && state.lastRow >= 0 && state.lastCol >= 0) {
     return { row: state.lastRow, col: state.lastCol };
   }
   return null;
 }
 
-function cx(col) { return PAD + col * CELL; }
-function cy(row) { return PAD + row * CELL; }
+function cx(col) {
+  return PAD + col * CELL;
+}
+
+function cy(row) {
+  return PAD + row * CELL;
+}
 
 function drawBoardSurface(context) {
-  context.fillStyle = '#c19a49';
+  const wood = context.createLinearGradient(0, 0, BOARD_PX, BOARD_PX);
+  wood.addColorStop(0, '#d2ad60');
+  wood.addColorStop(0.48, '#c69a4c');
+  wood.addColorStop(1, '#b78434');
+  context.fillStyle = wood;
   context.fillRect(0, 0, BOARD_PX, BOARD_PX);
 
-  context.strokeStyle = '#9a7530';
+  context.fillStyle = 'rgba(255,255,255,0.07)';
+  for (let y = 0; y < BOARD_PX; y += 46) {
+    context.fillRect(0, y, BOARD_PX, 1);
+  }
+
+  context.strokeStyle = '#845c1f';
   context.lineWidth = 1;
-  for (let i = 0; i < SIZE; i++) {
+  for (let i = 0; i < SIZE; i += 1) {
     context.beginPath();
     context.moveTo(cx(0), cy(i));
     context.lineTo(cx(SIZE - 1), cy(i));
@@ -469,7 +512,7 @@ function drawBoardSurface(context) {
   }
 
   const stars = [[3, 3], [3, 11], [7, 7], [11, 3], [11, 11]];
-  context.fillStyle = '#7a5c20';
+  context.fillStyle = '#6f4b16';
   stars.forEach(([row, col]) => {
     context.beginPath();
     context.arc(cx(col), cy(row), 3, 0, Math.PI * 2);
@@ -484,20 +527,22 @@ function drawStone(context, row, col, stone, scale) {
   context.translate(x, y);
   context.scale(scale, scale);
 
-  const grad = context.createRadialGradient(-RADIUS * 0.3, -RADIUS * 0.3, 1, 0, 0, RADIUS);
+  const grad = context.createRadialGradient(-RADIUS * 0.32, -RADIUS * 0.32, 1, 0, 0, RADIUS);
   if (stone === 1) {
-    grad.addColorStop(0, '#555');
-    grad.addColorStop(1, '#111');
+    grad.addColorStop(0, '#666a70');
+    grad.addColorStop(0.55, '#21252d');
+    grad.addColorStop(1, '#0b0d12');
   } else {
-    grad.addColorStop(0, '#fff');
-    grad.addColorStop(1, '#d0ccc8');
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(0.7, '#ece5d9');
+    grad.addColorStop(1, '#c9c0b4');
   }
 
   context.beginPath();
   context.arc(0, 0, RADIUS, 0, Math.PI * 2);
   context.fillStyle = grad;
-  context.shadowColor = 'rgba(0,0,0,.4)';
-  context.shadowBlur = 6;
+  context.shadowColor = 'rgba(0,0,0,0.34)';
+  context.shadowBlur = 7;
   context.shadowOffsetY = 2;
   context.fill();
   context.restore();
@@ -507,18 +552,18 @@ function drawLastMark(context, row, col) {
   const x = cx(col);
   const y = cy(row);
   const size = 6;
-  context.fillStyle = 'rgba(212, 168, 67, 0.88)';
+  context.fillStyle = 'rgba(177, 84, 64, 0.92)';
   context.fillRect(x - size / 2, y - size / 2, size, size);
 }
 
 function drawPulse(context, row, col, t) {
   const x = cx(col);
   const y = cy(row);
-  const radius = RADIUS + t * 14;
-  const alpha = (1 - t) * 0.6;
+  const radius = RADIUS + t * 12;
+  const alpha = (1 - t) * 0.46;
   context.beginPath();
   context.arc(x, y, radius, 0, Math.PI * 2);
-  context.strokeStyle = `rgba(212, 168, 67, ${alpha})`;
+  context.strokeStyle = `rgba(177, 84, 64, ${alpha})`;
   context.lineWidth = 2;
   context.stroke();
 }
@@ -528,13 +573,13 @@ function drawHintMark(context, row, col) {
   const y = cy(row);
   context.beginPath();
   context.arc(x, y, RADIUS + 5, 0, Math.PI * 2);
-  context.strokeStyle = 'rgba(90, 220, 190, 0.85)';
+  context.strokeStyle = 'rgba(92, 208, 191, 0.88)';
   context.lineWidth = 2;
   context.stroke();
 
   context.beginPath();
   context.arc(x, y, 4, 0, Math.PI * 2);
-  context.fillStyle = 'rgba(90, 220, 190, 0.35)';
+  context.fillStyle = 'rgba(92, 208, 191, 0.34)';
   context.fill();
 }
 
@@ -548,11 +593,11 @@ function render() {
 
   const animating = new Set();
   if (!reviewState.open) {
-    dropFrames.forEach(frame => animating.add(`${frame.row},${frame.col}`));
+    dropFrames.forEach((frame) => animating.add(`${frame.row},${frame.col}`));
   }
 
-  for (let r = 0; r < SIZE; r++) {
-    for (let c = 0; c < SIZE; c++) {
+  for (let r = 0; r < SIZE; r += 1) {
+    for (let c = 0; c < SIZE; c += 1) {
       if (board[r][c] !== 0 && !animating.has(`${r},${c}`)) {
         drawStone(ctx, r, c, board[r][c], 1);
       }
@@ -572,20 +617,20 @@ function render() {
 
   const dt = 1 / 60;
   const dropDuration = 0.18;
-  const pulseDuration = 1.2;
+  const pulseDuration = 1.05;
 
-  dropFrames = dropFrames.filter(frame => {
+  dropFrames = dropFrames.filter((frame) => {
     frame.t += dt / dropDuration;
     const t = Math.min(frame.t, 1);
-    const scale = 1 + (t - 1) * (t - 1) * ((1.7 + 1) * (t - 1) + 1.7);
-    drawStone(ctx, frame.row, frame.col, frame.stone, Math.max(0.01, scale));
+    const eased = 1 + (t - 1) * (t - 1) * ((1.65 + 1) * (t - 1) + 1.65);
+    drawStone(ctx, frame.row, frame.col, frame.stone, Math.max(0.01, eased));
     return frame.t < 1;
   });
 
-  pulseFrames = pulseFrames.filter(frame => {
+  pulseFrames = pulseFrames.filter((frame) => {
     frame.t += dt / pulseDuration;
-    drawPulse(ctx, frame.row, frame.col, frame.t % 1);
-    return true;
+    drawPulse(ctx, frame.row, frame.col, frame.t);
+    return frame.t < 1;
   });
 
   if (dropFrames.length > 0 || pulseFrames.length > 0) {
@@ -598,7 +643,7 @@ function startRaf() {
   rafId = requestAnimationFrame(render);
 }
 
-canvas.addEventListener('click', event => {
+canvas.addEventListener('click', (event) => {
   if (busy || !state || state.gameOver || reviewState.open) return;
   if (state.mode === 'ai' && state.currentPlayer !== 1) return;
 

@@ -1,0 +1,47 @@
+/* Hallmark · tokens · tone: editorial gamebook · anchor hue: lacquer red */
+:root {
+  --color-night-0: oklch(19% 0.02 262);
+  --color-night-1: oklch(17% 0.015 258);
+  --color-night-2: oklch(13% 0.012 255);
+  --color-card: oklch(26% 0.02 255 / 0.9);
+  --color-card-line: oklch(42% 0.03 70 / 0.42);
+  --color-rule: oklch(54% 0.03 72 / 0.22);
+  --color-paper: oklch(94% 0.02 84);
+  --color-paper-soft: oklch(86% 0.02 84);
+  --color-paper-dim: oklch(73% 0.02 82);
+  --color-brass: oklch(77% 0.11 77);
+  --color-lacquer: oklch(58% 0.15 30);
+  --color-focus: oklch(81% 0.12 75);
+  --color-board: oklch(73% 0.13 73);
+  --color-board-line: oklch(48% 0.09 72);
+  --color-glow: oklch(42% 0.06 68 / 0.28);
+
+  --font-display: "STSong", "Songti SC", "Noto Serif SC", "Source Han Serif SC", serif;
+  --font-body: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 2.5rem;
+  --space-8: 3rem;
+  --space-10: 5rem;
+
+  --text-xs: 0.76rem;
+  --text-sm: 0.92rem;
+  --text-md: 1rem;
+  --text-xl: 1.3rem;
+  --text-2xl: 1.72rem;
+
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 26px;
+
+  --dur-fast: 160ms;
+  --dur-slow: 280ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
+
+  --shadow-card: 0 24px 52px rgba(0, 0, 0, 0.28);
+}

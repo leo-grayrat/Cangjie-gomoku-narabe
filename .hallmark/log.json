@@ -1,0 +1,10 @@
+[
+  {
+    "date": "2026-06-08",
+    "macrostructure": "Split Folio + Desk Column",
+    "theme": "custom",
+    "theme_axes": "night-paper / song-serif display / lacquer-red accent",
+    "enrichment": "none",
+    "brief": "Redesign the Gomoku frontend to feel like an editorial gamebook rather than a generic AI-built game page."
+  }
+]

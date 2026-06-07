@@ -9,122 +9,261 @@
 <body>
 
 <div id="view-home" class="view active">
-  <div class="home-inner">
-    <h1 class="site-title">仓颉五子棋</h1>
-    <p class="site-sub">基于仓颉后端的网页五子棋，支持本地双人和五档 AI 难度。</p>
+  <main class="home-shell">
+    <section class="home-intro">
+      <p class="serial-mark">仓颉实现 · Gomoku Notebook</p>
+      <h1 class="home-title">仓颉五子棋</h1>
+      <p class="home-lead">
+        这不是一个只负责开局的首页，而是一张可以坐下来下棋、复盘、顺手理解算法的棋局手册。
+      </p>
+      <div class="home-copy">
+        <p>
+          这里保留了五档人机风格：从先顾眼前局势的贪心，到会预想来回应手的 Minimax，
+          再到更稳定的 Alpha-Beta、带即时战术预检的 Expert，以及带开局定式味道的 Joseki。
+        </p>
+        <p>
+          真正的算法说明不放在首页，而放在棋盘下方。你开始一局之后，就能一边落子，
+          一边看到这一档 AI 的判断逻辑到底是什么。
+        </p>
+      </div>
+    </section>
 
-    <div class="mode-picker">
-      <div class="mode-primary">
-        <button class="mode-btn primary" onclick="startGame('pvp', 'easy')">
+    <aside class="launch-panel">
+      <div class="launch-head">
+        <p class="panel-kicker">开始一局</p>
+        <p class="panel-note">先决定是与朋友对坐，还是和不同风格的 AI 较量。</p>
+      </div>
+
+      <div class="launch-actions">
+        <button class="mode-btn mode-btn-primary" onclick="startGame('pvp', 'easy')">
           <span class="mode-name">本地双人</span>
-          <span class="mode-desc">两位玩家轮流在同一棋盘落子</span>
+          <span class="mode-desc">两位玩家在同一张棋盘前轮流落子，适合直接对局。</span>
         </button>
-        <button class="mode-btn primary" onclick="toggleDiffPanel()">
+
+        <button class="mode-btn" onclick="toggleDiffPanel()">
           <span class="mode-name">人机对战</span>
-          <span class="mode-desc">从 easy 到 joseki 选择你的对手</span>
+          <span class="mode-desc">先选一种算法风格，再看它会怎样思考这盘棋。</span>
           <span class="chevron" id="diff-chevron">›</span>
         </button>
-      </div>
 
-      <div class="diff-panel" id="diff-panel">
-        <div class="diff-panel-inner">
-          <button class="diff-btn" onclick="startGame('ai', 'easy')"><span class="diff-name">Easy</span><span class="diff-tag">入门</span></button>
-          <button class="diff-btn" onclick="startGame('ai', 'medium')"><span class="diff-name">Medium</span><span class="diff-tag">Minimax</span></button>
-          <button class="diff-btn" onclick="startGame('ai', 'hard')"><span class="diff-name">Hard</span><span class="diff-tag">Alpha-Beta</span></button>
-          <button class="diff-btn" onclick="startGame('ai', 'expert')"><span class="diff-name">Expert</span><span class="diff-tag">预检</span></button>
-          <button class="diff-btn" onclick="startGame('ai', 'joseki')"><span class="diff-name">Joseki</span><span class="diff-tag">定式</span></button>
+        <div class="diff-panel" id="diff-panel">
+          <div class="diff-panel-inner">
+            <button class="diff-btn" onclick="startGame('ai', 'easy')">
+              <span class="diff-name">Easy</span>
+              <span class="diff-tag">贪心</span>
+            </button>
+            <button class="diff-btn" onclick="startGame('ai', 'medium')">
+              <span class="diff-name">Medium</span>
+              <span class="diff-tag">Minimax</span>
+            </button>
+            <button class="diff-btn" onclick="startGame('ai', 'hard')">
+              <span class="diff-name">Hard</span>
+              <span class="diff-tag">Alpha-Beta</span>
+            </button>
+            <button class="diff-btn" onclick="startGame('ai', 'expert')">
+              <span class="diff-name">Expert</span>
+              <span class="diff-tag">战术预检</span>
+            </button>
+            <button class="diff-btn" onclick="startGame('ai', 'joseki')">
+              <span class="diff-name">Joseki</span>
+              <span class="diff-tag">开局定式</span>
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  </div>
+    </aside>
+  </main>
 </div>
 
 <div id="view-game" class="view">
-  <div class="game-header">
-    <button class="back-btn" onclick="goHome()">返回首页</button>
-    <span id="mode-label" class="mode-label"></span>
-    <div id="turn-indicator" class="turn-indicator">
-      <span id="turn-stone" class="turn-stone black"></span>
-      <span id="turn-text" class="turn-text">黑方回合</span>
-    </div>
-  </div>
+  <main class="game-shell">
+    <header class="game-toolbar">
+      <button class="back-btn" onclick="goHome()">返回首页</button>
 
-  <div class="board-container">
-    <canvas id="board" width="560" height="560"></canvas>
-    <div id="thinking-overlay" class="thinking-overlay hidden">
-      <div class="spinner"></div>
-      <span>AI 思考中</span>
-    </div>
-  </div>
-
-  <div class="action-bar">
-    <button id="undo-btn" class="action-btn" onclick="handleUndo()">悔棋</button>
-    <button id="hint-btn" class="action-btn" onclick="handleHint()">帮助</button>
-    <button id="review-btn" class="action-btn" onclick="openReview()">复盘</button>
-  </div>
-
-  <div id="review-panel" class="review-panel hidden">
-    <div class="review-title">终局复盘</div>
-    <div id="review-step" class="review-step"></div>
-    <div class="review-actions">
-      <button id="review-prev-btn" class="result-btn" onclick="stepReview(-1)">上一步</button>
-      <button id="review-next-btn" class="result-btn" onclick="stepReview(1)">下一步</button>
-      <button class="result-btn primary" onclick="closeReview()">退出复盘</button>
-    </div>
-  </div>
-
-  <p id="action-message" class="action-message"></p>
-
-  <div class="algo-detail-section">
-    <div class="algo-detail-block" data-diff="pvp">
-      <h3>本地双人</h3>
-      <p>这个模式不使用任何 AI 算法，只保留五子棋本身的规则判断。系统负责检查落子是否合法、是否形成五连，以及提供悔棋和复盘功能。</p>
-      <p>因此这里展示的不是“机器如何决策”，而是最基础的对局规则本身：黑白双方轮流落子，先在横、竖、斜任一方向连成五子者获胜。</p>
-    </div>
-    <div class="algo-detail-block" data-diff="easy">
-      <h3>Easy</h3>
-      <p>Easy 使用的是贪心启发式。它不去系统地推演很多步之后的变化，而是优先根据当前这一手能立刻带来的收益来做选择。</p>
-      <p>具体来说，贪心规则会先处理最直接的情况：如果存在一步取胜点，就立即落下；如果对手已经形成一步致胜威胁，就优先堵住。除此之外，它会在当前局面里寻找“这一手最划算”的位置，例如更容易连子的位置、能顺手破坏对手形状的位置，或者更适合继续扩张的点。</p>
-      <p>这种算法的特点是直观、反应快、容易给出看起来合理的下一手，但它主要关注眼前局部，不擅长处理较长的连续算路。因此它适合作为入门难度：有基本逻辑，但不会形成太强的中后盘压迫。</p>
-    </div>
-    <div class="algo-detail-block" data-diff="medium">
-      <h3>Medium</h3>
-      <p>Medium 使用的是 Minimax 算法。它会把当前每一个候选落点都继续往后展开，并且默认双方都会尽力去下对自己最有利的那一手，然后比较这些变化最后分别会把局面带到哪里。</p>
-      <p>因此，Minimax 的核心不是“只看当前这一手值不值”，而是比较不同落子在来回应对之后最终会导向怎样的局面。可以把它理解成一种“先想自己的下一手，再想对方会怎样反击，然后再比较哪条路整体更好”的方法。</p>
-      <p>与贪心算法相比，Minimax 更强调成套的攻防关系，而不是单手得失。所以这一档已经会表现出比较明确的对招意识：它不只是补眼前的点，还会考虑这一步之后局面会如何继续展开。</p>
-    </div>
-    <div class="algo-detail-block" data-diff="hard">
-      <h3>Hard</h3>
-      <p>Hard 建立在 Minimax 的博弈思想之上，但进一步使用 Alpha-Beta 剪枝来优化判断过程。它仍然是在比较“我走这一步以后，对手最可能怎样回”，只是会更快排除那些已经明显不优的变化。</p>
-      <p>Alpha-Beta 的重点在于：并不是每一种变化都值得继续往下分析。如果某条线路已经能够判断出结果不会比当前已知方案更好，那么后面的细节就没有必要继续展开。这样做不会改变决策逻辑，但能把更多精力留给真正关键的变化。</p>
-      <p>从对局表现上看，这一档会比普通 Minimax 更稳定，尤其是在局面开始变复杂的时候。它更擅长抓住真正重要的攻防点，不容易被表面上好看、实际价值不高的变化带偏。</p>
-    </div>
-    <div class="algo-detail-block" data-diff="expert">
-      <h3>Expert</h3>
-      <p>Expert 的思路可以概括为“先做即时战术判断，再做整体局面判断”。也就是说，在进入较完整的搜索之前，它会先检查棋盘上是否已经存在一步取胜点，或者是否已经出现必须立刻防守的致命点。</p>
-      <p>这样做的原因很简单：在五子棋里，有些局面并不需要复杂分析，因为胜负已经压缩到一两手之内。与其让搜索过程去慢慢发现这些紧急点，不如先把它们直接提出来处理。</p>
-      <p>处理完这些最高优先级的战术问题后，它再回到更完整的局面推演。所以这一档在对杀、冲四、补断、临门一脚这类场景里通常更稳，整体风格也会比前一档更少出现明显漏洞。</p>
-    </div>
-    <div class="algo-detail-block" data-diff="joseki">
-      <h3>Joseki</h3>
-      <p>Joseki 这一档前期使用的是定式思路。所谓定式，可以理解为某些开局形状下较成熟、较常见的一组应手方式。程序如果识别到棋局进入了这些已知结构，就会优先按照定式来落子。</p>
-      <p>这种方法和纯搜索不同。它的前几手并不主要依赖“临场一步一步计算”，而是先借助已有的开局知识来应对。因此这一档在开局阶段往往会显得更有套路感，也更像是在沿着某种固定章法展开。</p>
-      <p>不过定式只适用于它覆盖到的开局范围。一旦局面偏离这些已知结构，程序就会退出定式阶段，回到一般的实战判断方式。所以这一档最有特点的部分主要体现在开局：它展示的是“开局知识”如何参与对局，而不是从头到尾都只靠定式完成整盘棋。</p>
-    </div>
-  </div>
-
-  <div id="result-overlay" class="result-overlay hidden" onclick="handleOverlayClick(event)">
-    <div class="result-card">
-      <div class="result-icon" id="result-icon">●</div>
-      <div class="result-title" id="result-title"></div>
-      <div class="result-sub" id="result-sub"></div>
-      <div class="result-actions">
-        <button class="result-btn primary" onclick="restartGame()">再来一局</button>
-        <button class="result-btn" onclick="openReview()">复盘</button>
-        <button class="result-btn" onclick="goHome()">返回首页</button>
+      <div class="table-meta">
+        <span id="mode-label" class="mode-label"></span>
+        <span id="table-note" class="table-note">这一局里的悔棋、帮助和复盘都围绕同一张棋盘展开。</span>
       </div>
-    </div>
-  </div>
+
+      <div id="turn-indicator" class="turn-indicator">
+        <span id="turn-stone" class="turn-stone black"></span>
+        <span class="turn-copy">
+          <span class="turn-kicker">当前回合</span>
+          <span id="turn-text" class="turn-text">黑子落子</span>
+        </span>
+      </div>
+    </header>
+
+    <section class="play-surface">
+      <section class="board-frame">
+        <div class="frame-head">
+          <div>
+            <p class="frame-kicker">对局桌面</p>
+            <h2 class="frame-title">把棋局摆在桌上</h2>
+          </div>
+          <p class="frame-note">真正的判断、试探、补断与复盘，都从这张棋盘开始。</p>
+        </div>
+
+        <div class="board-container">
+          <canvas id="board" width="560" height="560"></canvas>
+          <div id="thinking-overlay" class="thinking-overlay hidden">
+            <div class="spinner"></div>
+            <span>AI 正在推演棋局</span>
+          </div>
+        </div>
+      </section>
+
+      <aside class="control-column">
+        <section class="guide-card">
+          <p class="card-kicker">本局操作</p>
+          <p>局中可以悔棋，帮助只在当前人类回合开放；终局之后则改为进入复盘。</p>
+        </section>
+
+        <div class="action-bar">
+          <button id="undo-btn" class="action-btn" onclick="handleUndo()">悔棋</button>
+          <button id="hint-btn" class="action-btn" onclick="handleHint()">帮助</button>
+          <button id="review-btn" class="action-btn" onclick="openReview()">复盘</button>
+        </div>
+
+        <p id="action-message" class="action-message"></p>
+
+        <section id="result-panel" class="result-panel hidden">
+          <div id="result-icon" class="result-icon">●</div>
+          <div id="result-title" class="result-title"></div>
+          <p id="result-sub" class="result-sub"></p>
+          <div class="result-actions">
+            <button class="result-btn primary" onclick="openReview()">进入复盘</button>
+            <button class="result-btn" onclick="restartGame()">再来一局</button>
+          </div>
+        </section>
+
+        <section id="review-panel" class="review-panel hidden">
+          <div class="review-head">
+            <div>
+              <p class="card-kicker">终局复盘</p>
+              <div id="review-step" class="review-step"></div>
+            </div>
+            <button class="review-close" onclick="closeReview()">退出复盘</button>
+          </div>
+          <div class="review-actions">
+            <button id="review-prev-btn" class="result-btn" onclick="stepReview(-1)">上一步</button>
+            <button id="review-next-btn" class="result-btn" onclick="stepReview(1)">下一步</button>
+          </div>
+        </section>
+      </aside>
+    </section>
+
+    <section class="algo-detail-section">
+      <div class="detail-head">
+        <p class="section-kicker">算法手札</p>
+        <h2>这一档 AI 在按什么逻辑下棋？</h2>
+        <p>
+          这里解释的是它的判断方式，而不是底层参数。
+          你看到的，是玩家视角下真正有用的算法原理。
+        </p>
+      </div>
+
+      <div class="algo-detail-block" data-diff="pvp">
+        <h3>本地双人</h3>
+        <p>
+          这个模式没有 AI 决策。系统只负责维护五子棋本身的规则：轮流落子、检查禁用位置、
+          判断是否形成五连，以及提供悔棋和终局复盘。
+        </p>
+        <p>
+          所以它更像一张干净的对局桌。你和朋友面对的是同一套棋局规则，
+          而不是某种会替你判断下一手的机器逻辑。
+        </p>
+      </div>
+
+      <div class="algo-detail-block" data-diff="easy">
+        <h3>Easy</h3>
+        <p>
+          Easy 用的是贪心思路。所谓贪心，就是每次都优先挑眼前最划算、最直接的那一步，
+          不先把后面很多回合都完整推演出来。
+        </p>
+        <p>
+          放到五子棋里，它会先看有没有立刻赢棋的点；如果对手已经出现一步致胜的威胁，
+          它也会先去补防。除此之外，它会偏向那些能马上让自己连子更顺、
+          或者能顺手破坏对方形状的位置。
+        </p>
+        <p>
+          这种算法反应快、直觉感强，看上去常常“这手下得没毛病”，
+          但它更关注眼前这一拍，遇到需要提前铺垫的长线攻防时，就不如后面的难度稳。
+        </p>
+      </div>
+
+      <div class="algo-detail-block" data-diff="medium">
+        <h3>Medium</h3>
+        <p>
+          Medium 使用的是 Minimax。它会把当前若干个可选落点当成分叉，
+          然后继续往后看：如果我走这一步，对手最合理的反击会是什么；
+          如果对手那样反击，我接下来还能不能把局面拉回来。
+        </p>
+        <p>
+          Minimax 的核心，是默认双方都会尽量替自己争取最好结果。
+          因此它不会只盯着“这一步眼前赚不赚”，而是比较每一种下法在一来一回之后，
+          最终会把棋局带到什么样的位置，再从中选出对自己最稳妥的一条。
+        </p>
+        <p>
+          这让它开始具备比较明确的对招意识。它不是只会补眼前，
+          而是会考虑“我这样走之后，你多半会怎么回”，所以比单纯贪心更像在真正对弈。
+        </p>
+      </div>
+
+      <div class="algo-detail-block" data-diff="hard">
+        <h3>Hard</h3>
+        <p>
+          Hard 的判断逻辑和 Minimax 属于同一条路数，但它用 Alpha-Beta 剪枝来加快取舍。
+          可以把它理解成“仍然按对弈推演来选招，只是不再把明显没必要看的分支也一条条看完”。
+        </p>
+        <p>
+          当某种变化已经足够说明“这条路不可能比手里更好的方案更优”时，
+          它就会及时停下，转去看更值得看的变化。这样并不会改变它的决策原则，
+          但能把更多精力放在真正关键的地方。
+        </p>
+        <p>
+          对局体验上，这一档通常比普通 Minimax 更稳。它更不容易被表面上好看的招法带偏，
+          在局势变复杂时，也更能抓住真正影响胜负的攻防点。
+        </p>
+      </div>
+
+      <div class="algo-detail-block" data-diff="expert">
+        <h3>Expert</h3>
+        <p>
+          Expert 会先做一层即时战术判断，再进入整体推演。
+          也就是说，它首先会检查棋盘上有没有一步取胜点，
+          或者有没有必须立刻补掉的致命威胁。
+        </p>
+        <p>
+          这样做的原因很直接：五子棋里有些局面根本不需要慢慢算，
+          因为胜负已经压缩在一两手之内。与其把这些紧急点埋在后面的搜索里，
+          不如先把它们直接拎出来处理。
+        </p>
+        <p>
+          处理完这些最高优先级的问题以后，它再回到更完整的局面判断。
+          所以这一档在对杀、冲四、补断这些战术场景里通常更果断，也更少出现明显漏招。
+        </p>
+      </div>
+
+      <div class="algo-detail-block" data-diff="joseki">
+        <h3>Joseki</h3>
+        <p>
+          Joseki 的特色在开局。所谓定式，可以理解成某些常见开局形状下，
+          已经被反复研究过的一组典型应手。
+        </p>
+        <p>
+          如果程序识别到棋局进入了这些已知结构，它会优先沿着定式来走。
+          这和单纯临场推演不一样，因为它借用了现成的开局知识，
+          所以前几手会显得更有章法，也更像在沿着一条熟路展开布局。
+        </p>
+        <p>
+          但定式并不会包办整盘棋。一旦局面偏离这些已知结构，
+          它就会退出定式阶段，回到一般的实战判断方式。
+          所以这档最鲜明的特点，集中体现在开局阶段的“有谱感”。
+        </p>
+      </div>
+    </section>
+  </main>
 </div>
 
 <script src="/app.js"></script>

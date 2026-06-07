@@ -8,15 +8,16 @@ const RADIUS = 14;     // stone radius
 const BOARD_PX = PAD * 2 + CELL * (SIZE - 1);  // = 560 with above values
 
 const ALGO_HINTS = {
-  greedy:    '贪心启发式：对每个候选落点计算棋型得分，取最高分直接落子，无搜索，速度最快。',
-  minimax:   'Minimax（深度 3）：递归枚举双方应对，叶节点用棋型评估函数打分，回溯选最优路径。',
-  alphabeta: 'Alpha-Beta 剪枝（深度 4）：维护搜索上下界，提前剪掉无效分支，效率远优于纯 Minimax。',
-  solver:    '必胜算法：优先检测立即赢棋和必防点，关键局面走出强制获胜序列，退化时使用 Alpha-Beta。',
+  easy:    '简单：防必输 + 70% 贪心启发 + 30% 随机邻近落子，会犯明显错误。',
+  medium:  'Minimax（深度 3，候选 10）：无剪枝递归搜索，有基本策略意识，中级玩家可击败。',
+  hard:    'Alpha-Beta（深度 4，候选 15）：剪枝优化搜索，需要提前规划才能取胜。',
+  expert:  '专家：预检必胜/必防点 + Alpha-Beta（深度 4，候选 20），最强搜索难度。',
+  joseki:  '定式：前期按天元开局定式落子，出库后退化为 Hard 强度。知道定式的玩家可专门引它出库。',
 };
 
 const ALGO_NAMES = {
-  greedy: '人机·贪心', minimax: '人机·Minimax',
-  alphabeta: '人机·Alpha-Beta', solver: '人机·必胜',
+  easy: '人机·简单', medium: '人机·Minimax',
+  hard: '人机·Hard', expert: '人机·专家', joseki: '人机·定式',
 };
 
 let state = null;

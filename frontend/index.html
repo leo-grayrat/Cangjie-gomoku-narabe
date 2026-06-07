@@ -12,45 +12,52 @@
 <div id="view-home" class="view active">
   <div class="home-inner">
     <h1 class="site-title">仓颉五子棋</h1>
-    <p class="site-sub">基于仓颉语言后端的网页五子棋，四种 AI 难度</p>
+    <p class="site-sub">基于仓颉语言后端的网页五子棋，五种 AI 难度</p>
 
     <div class="mode-list">
-      <button class="mode-btn" onclick="startGame('pvp','greedy')">
+      <button class="mode-btn" onclick="startGame('pvp','easy')">
         <span class="mode-name">本地双人</span>
         <span class="mode-desc">两人共用一台设备对弈</span>
       </button>
-      <button class="mode-btn" onclick="startGame('ai','greedy')">
-        <span class="mode-name">人机 · 贪心</span>
-        <span class="mode-desc">纯启发式评分，反应最快</span>
+      <button class="mode-btn" onclick="startGame('ai','easy')">
+        <span class="mode-name">人机 · 简单</span>
+        <span class="mode-desc">会犯错，适合入门</span>
       </button>
-      <button class="mode-btn" onclick="startGame('ai','minimax')">
+      <button class="mode-btn" onclick="startGame('ai','medium')">
         <span class="mode-name">人机 · Minimax</span>
-        <span class="mode-desc">三层博弈搜索，有策略意识</span>
+        <span class="mode-desc">三层无剪枝搜索，有策略意识</span>
       </button>
-      <button class="mode-btn" onclick="startGame('ai','alphabeta')">
-        <span class="mode-name">人机 · Alpha-Beta</span>
-        <span class="mode-desc">剪枝优化，深度更大更强</span>
+      <button class="mode-btn" onclick="startGame('ai','hard')">
+        <span class="mode-name">人机 · Hard</span>
+        <span class="mode-desc">Alpha-Beta 深度4，需要规划</span>
       </button>
-      <button class="mode-btn" onclick="startGame('ai','solver')">
-        <span class="mode-name">人机 · 必胜</span>
-        <span class="mode-desc">威胁序列搜索，最强难度</span>
+      <button class="mode-btn" onclick="startGame('ai','expert')">
+        <span class="mode-name">人机 · 专家</span>
+        <span class="mode-desc">预检必胜/防守 + 最强搜索</span>
+      </button>
+      <button class="mode-btn" onclick="startGame('ai','joseki')">
+        <span class="mode-name">人机 · 定式</span>
+        <span class="mode-desc">前期走天元定式，出库后退化</span>
       </button>
     </div>
 
     <div class="algo-section">
       <h2>算法说明</h2>
       <dl class="algo-list">
-        <dt>贪心启发式</dt>
-        <dd>对每个候选空格，分别计算己方和对手在该位置的棋型得分，加权后选最高分直接落子。无搜索，速度最快，但缺乏预判。</dd>
+        <dt>简单</dt>
+        <dd>防必输 + 70% 贪心启发 + 30% 随机邻近落子，会犯明显错误，适合入门练习。</dd>
 
         <dt>Minimax</dt>
-        <dd>递归枚举己方和对手的应对，深度为 3 层，在叶节点用棋型评估函数打分，回溯选取最优路径。能识别简单的对手威胁。</dd>
+        <dd>深度 3 层无剪枝递归搜索，候选点 10 个，能识别基本威胁。中级玩家可以击败。</dd>
 
-        <dt>Alpha-Beta 剪枝</dt>
-        <dd>在 Minimax 基础上加入 α-β 剪枝：维护当前搜索的上下界，提前放弃无法改善结果的分支。搜索深度 4 层，效率远优于纯 Minimax。</dd>
+        <dt>Hard（Alpha-Beta）</dt>
+        <dd>Alpha-Beta 剪枝，深度 4 层，候选点 15 个。比 Minimax 效率更高、看得更远，需要提前规划才能取胜。</dd>
 
-        <dt>必胜算法（Solver）</dt>
-        <dd>优先检测立即赢棋和必须防守的点，若无则回退到 Alpha-Beta。配合候选点启发排序，能在关键局面走出强制获胜序列。</dd>
+        <dt>专家</dt>
+        <dd>先预检立即赢棋和必防点，再用 Alpha-Beta（深度 4，候选 20）搜索。在对攻残局中表现明显优于 Hard。</dd>
+
+        <dt>定式</dt>
+        <dd>前期按天元开局定式落子（AI 执白），出库后退化为 Hard 强度。了解定式的玩家可以专门走出库外位置来破解它。</dd>
       </dl>
     </div>
   </div>

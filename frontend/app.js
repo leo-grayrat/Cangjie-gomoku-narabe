@@ -15,15 +15,6 @@ const MODE_TEXT = {
   joseki: '人机对战 · Joseki'
 };
 
-const TABLE_NOTE = {
-  pvp: '两位玩家轮流落子，系统只负责规则、悔棋与复盘。',
-  easy: '这一档先看眼前最划算的点，更像直觉型下法。',
-  medium: '这一档会预想你来我往的应手，是标准的 Minimax 思路。',
-  hard: '这一档会更稳地筛掉无效变化，把注意力放在关键攻防上。',
-  expert: '这一档会先检查一步胜负与紧急威胁，再进入整体推演。',
-  joseki: '这一档的特色在开局，先走定式味更强，出库后再回到实战判断。'
-};
-
 let state = null;
 let busy = false;
 let currentMode = 'ai';
@@ -87,7 +78,6 @@ async function startGame(mode, diff) {
 
   const key = mode === 'pvp' ? 'pvp' : diff;
   document.getElementById('mode-label').textContent = MODE_TEXT[key] || key;
-  document.getElementById('table-note').textContent = TABLE_NOTE[key] || TABLE_NOTE.easy;
   showAlgoDetail(mode, diff);
 
   setLoading(true);
@@ -95,7 +85,7 @@ async function startGame(mode, diff) {
     const data = await api(`/api/new?mode=${mode}&diff=${diff}`);
     applyState(data, { action: 'new' });
   } catch (error) {
-    setFlash('新对局没有成功建立，请稍后重试。');
+    setFlash('新对局创建失败，请重试。');
   } finally {
     setLoading(false);
   }
@@ -127,7 +117,7 @@ async function doMove(row, col) {
     const data = await api(`/api/move?row=${row}&col=${col}`);
     applyState(data, { action: 'move', moveRow: row, moveCol: col });
   } catch (error) {
-    setFlash('这一手没有成功送到棋盘上。');
+    setFlash('落子失败，请重试。');
   } finally {
     setLoading(false);
   }
@@ -141,7 +131,7 @@ async function handleUndo() {
     const data = await api('/api/undo');
     applyState(data, { action: 'undo' });
   } catch (error) {
-    setFlash('悔棋请求没有成功返回。');
+    setFlash('悔棋失败，请重试。');
   } finally {
     setLoading(false);
   }
@@ -156,14 +146,14 @@ async function handleHint() {
     const data = await api('/api/hint');
     if (data.ok) {
       hintPos = { row: data.row, col: data.col };
-      setFlash('建议落点已经标在棋盘上。');
+      setFlash('建议落点已标出。');
       updateButtons();
       startRaf();
     } else {
-      setFlash(data.message || '当前还不能请求帮助。');
+      setFlash(data.message || '当前不能请求帮助。');
     }
   } catch (error) {
-    setFlash('帮助请求没有成功返回。');
+    setFlash('帮助请求失败，请重试。');
   } finally {
     setLoading(false);
   }
@@ -171,7 +161,7 @@ async function handleHint() {
 
 function openReview() {
   if (!state || !state.gameOver || moveHistory.length <= 1) {
-    setFlash('只有终局之后才能进入复盘。');
+    setFlash('只有终局后才能复盘。');
     return;
   }
 
@@ -240,11 +230,11 @@ function applyState(data, options = {}) {
   updateReviewUI();
 
   if (action === 'new' && data.ok) {
-    setFlash('新对局已经开始。');
+    setFlash('新对局已开始。');
   } else if (action === 'undo') {
-    setFlash(data.ok ? '已回到上一个可继续落子的局面。' : (data.message || '当前没有可悔棋的步骤。'));
+    setFlash(data.ok ? '已悔棋。' : (data.message || '当前没有可悔棋的步骤。'));
   } else if (!data.ok) {
-    setFlash(data.message || '这一步暂时不能落下。');
+    setFlash(data.message || '当前不能这样操作。');
   } else {
     setFlash('', 0);
   }
@@ -296,10 +286,10 @@ function updateTurnIndicator(data) {
       text.textContent = '本局平局';
     } else if (data.winner === 1) {
       stone.classList.add('black');
-      text.textContent = '黑子胜出';
+      text.textContent = '黑子获胜';
     } else {
       stone.classList.add('white');
-      text.textContent = '白子胜出';
+      text.textContent = '白子获胜';
     }
 
     clearResultTimer();
@@ -314,7 +304,7 @@ function updateTurnIndicator(data) {
   clearResultTimer();
   if (data.mode === 'ai' && data.currentPlayer === 2) {
     stone.classList.add('white', 'ai');
-    text.textContent = 'AI 思考中';
+    text.textContent = 'AI 回合';
     return;
   }
 
@@ -331,23 +321,19 @@ function showResult(winner) {
   const panel = document.getElementById('result-panel');
   const icon = document.getElementById('result-icon');
   const title = document.getElementById('result-title');
-  const sub = document.getElementById('result-sub');
 
   if (winner === 0) {
     icon.className = 'result-icon draw';
     icon.textContent = '和';
-    title.textContent = '这一局收成平局';
-    sub.textContent = '如果想回头看双方怎么把局面推到这里，现在就可以进入复盘。';
+    title.textContent = '本局平局';
   } else if (winner === 1) {
     icon.className = 'result-icon black';
     icon.textContent = '●';
-    title.textContent = '黑子赢下这一局';
-    sub.textContent = '终局已经固定，你可以立即复盘，也可以直接重开新局。';
+    title.textContent = '黑子获胜';
   } else {
     icon.className = 'result-icon white';
     icon.textContent = '●';
-    title.textContent = '白子赢下这一局';
-    sub.textContent = '终局已经固定，你可以立即复盘，也可以直接重开新局。';
+    title.textContent = '白子获胜';
   }
 
   panel.classList.remove('hidden');

@@ -485,9 +485,19 @@ button:focus-visible {
   gap: var(--space-4);
 }
 
+.sidebar-insights {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.insight-card,
 .result-panel,
 .review-panel {
   padding: var(--space-5);
+  background: var(--color-card);
+  border: 1px solid var(--color-card-line);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
 }
 
 .action-bar {
@@ -533,6 +543,121 @@ button:focus-visible {
   min-height: 1.6rem;
   margin: 0;
   color: var(--color-brass);
+  font-size: var(--text-sm);
+}
+
+.prediction-panel {
+  background:
+    linear-gradient(180deg,
+      color-mix(in oklab, var(--color-brass) 7%, var(--color-card) 93%) 0%,
+      var(--color-card) 100%);
+}
+
+.prediction-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+  margin-top: var(--space-3);
+}
+
+.prediction-side {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.prediction-side:last-child {
+  text-align: right;
+}
+
+.prediction-name {
+  color: var(--color-paper-dim);
+  font-size: var(--text-sm);
+}
+
+.prediction-rate {
+  color: var(--color-paper);
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1;
+}
+
+.prediction-divider {
+  width: 1px;
+  height: 2.4rem;
+  background: var(--color-rule);
+}
+
+.prediction-bar {
+  display: flex;
+  margin-top: var(--space-4);
+  height: 0.9rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--color-card-line) 88%, transparent);
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg,
+      color-mix(in oklab, #15171d 90%, var(--color-card) 10%) 0%,
+      color-mix(in oklab, #f4eee4 88%, var(--color-card) 12%) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.prediction-bar-fill {
+  height: 100%;
+  transition: width var(--dur-fast) var(--ease-out);
+}
+
+.prediction-bar-black {
+  background:
+    linear-gradient(180deg,
+      color-mix(in oklab, #2b2f37 88%, black 12%) 0%,
+      color-mix(in oklab, #0d1016 92%, black 8%) 100%);
+}
+
+.prediction-bar-white {
+  background:
+    linear-gradient(180deg,
+      color-mix(in oklab, #fffaf0 94%, white 6%) 0%,
+      color-mix(in oklab, #dbd1c0 92%, black 8%) 100%);
+  box-shadow: inset 1px 0 0 rgba(36, 31, 24, 0.18);
+}
+
+.prediction-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  align-items: center;
+  margin-top: var(--space-4);
+}
+
+.prediction-label,
+.prediction-score {
+  color: var(--color-paper-soft);
+  font-size: var(--text-sm);
+}
+
+.prediction-label {
+  color: var(--color-brass);
+  font-weight: 700;
+}
+
+.prediction-foot {
+  margin: var(--space-3) 0 0;
+  color: var(--color-paper-dim);
+  font-size: var(--text-xs);
+}
+
+.trivia-title {
+  margin: var(--space-3) 0 0;
+  color: var(--color-paper);
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+
+.trivia-text {
+  margin: var(--space-3) 0 0;
+  color: var(--color-paper-soft);
   font-size: var(--text-sm);
 }
 
@@ -719,6 +844,16 @@ button:focus-visible {
   .board-container {
     padding: var(--space-3);
   }
+
+  .action-bar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .action-btn {
+    padding: 0.86rem 0.55rem;
+    font-size: 0.88rem;
+  }
 }
 
 @media (max-width: 414px) {
@@ -733,6 +868,11 @@ button:focus-visible {
 
   .turn-indicator {
     width: 100%;
+  }
+
+  .prediction-meta {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 

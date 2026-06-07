@@ -15,6 +15,217 @@ const MODE_TEXT = {
   joseki: '人机对战 · Joseki'
 };
 
+const TRIVIA_BY_KEY = {
+  pvp: {
+    title: '双人对局',
+    text: '标准五子棋的目标是在横、竖或斜向先连成五子。没有 AI 参与时，这一局只检验双方对局面的判断。'
+  },
+  easy: {
+    title: '贪心策略',
+    text: '贪心算法会优先处理眼前最直接的得失。它不一定看得远，但通常会先去抓住当前最划算的一手。'
+  },
+  medium: {
+    title: 'Minimax',
+    text: 'Minimax 假设双方都会选择对自己最有利的下法，因此擅长比较一来一回之后，局面最终会走向哪里。'
+  },
+  hard: {
+    title: 'Alpha-Beta',
+    text: 'Alpha-Beta 不是另一套新规则，而是 Minimax 的剪枝加速方式，用来更早排除明显不优的分支。'
+  },
+  expert: {
+    title: '战术预检',
+    text: '很多五子棋胜负并不需要长算，只要先抓住一步取胜点或必须补防的位置，判断就会立刻清楚很多。'
+  },
+  joseki: {
+    title: '开局定式',
+    text: '定式的价值主要体现在开局。它记录的是一些常见结构下较成熟的应对方式，而不是整盘棋的完整答案。'
+  }
+};
+
+const DISPLAY_MODE_TEXT = {
+  pvp: '本地双人',
+  easy: '人机对战 · Easy',
+  medium: '人机对战 · Medium',
+  hard: '人机对战 · Hard',
+  expert: '人机对战 · Expert',
+  joseki: '人机对战 · Joseki'
+};
+
+const TRIVIA_FACTS_BY_KEY = {
+  pvp: [
+    {
+      title: '棋盘规格',
+      text: '现代五子棋通常用 15×15 棋盘进行对局，19×19 棋盘在更早的时期也很常见。',
+      source: 'https://en.wikipedia.org/wiki/Gomoku'
+    },
+    {
+      title: '纸笔也能玩',
+      text: '因为棋子落下后通常不会移动或拿走，五子棋也常被当作纸笔游戏来玩。',
+      source: 'https://en.wikipedia.org/wiki/Gomoku'
+    },
+    {
+      title: '基本胜负',
+      text: '标准规则下，双方轮流落子，先在横、竖或斜方向连成五子的一方获胜。',
+      source: 'https://en.wikipedia.org/wiki/Gomoku'
+    },
+    {
+      title: '长连规则',
+      text: '有些规则要求必须正好五连，六子以上的长连不算胜利，这种情况叫作“长连”。',
+      source: 'https://en.wikipedia.org/wiki/Gomoku'
+    },
+    {
+      title: '先手优势',
+      text: '黑棋先行，这也是五子棋长期存在先手优势讨论的根源之一。',
+      source: 'https://en.wikipedia.org/wiki/Gomoku'
+    }
+  ],
+  easy: [
+    {
+      title: '换手规则',
+      text: '在中国常见的一类规则里，黑棋第一手落下后，白棋可以直接选择是否交换黑白，以减轻先手优势。',
+      source: 'https://en.wikipedia.org/wiki/Gomoku'
+    },
+    {
+      title: '趣味变体',
+      text: 'Ninuki-Renju 会加入“吃子”规则：夹住对方连续两子时，可以把这一对棋子提走。',
+      source: 'https://en.wikipedia.org/wiki/Gomoku'
+    },
+    {
+      title: 'Pente 亲戚',
+      text: 'Pente 和 Ninuki-Renju 都带有吃子机制，但 Pente 常用 19×19 棋盘，也不采用黑方禁手。',
+      source: 'https://en.wikipedia.org/wiki/Gomoku'
+    },
+    {
+      title: '韩式变体',
+      text: 'Omok 和自由五子棋很接近，但常在 19×19 棋盘上进行，还会加入“三三禁手”。',
+      source: 'https://en.wikipedia.org/wiki/Gomoku'
+    },
+    {
+      title: '越南变体',
+      text: 'Caro 规则要求胜利线不能同时被两端堵死，因此防守方式和普通五子棋会有明显差别。',
+      source: 'https://en.wikipedia.org/wiki/Gomoku'
+    }
+  ],
+  medium: [
+    {
+      title: '组合博弈',
+      text: '从理论上看，五子棋属于 m,n,k 一类的连线游戏：在 m×n 棋盘上，先连成 k 子的一方获胜。',
+      source: 'https://en.wikipedia.org/wiki/Gomoku'
+    },
+    {
+      title: '先手必胜',
+      text: '1994 年，Victor Allis 证明了在空的 15×15 棋盘上、没有额外开局限制时，先手一方存在必胜策略。',
+      source: 'https://en.wikipedia.org/wiki/Gomoku'
+    },
+    {
+      title: '问题还没结束',
+      text: '虽然无禁自由五子棋已有经典结论，但职业比赛常用的 Swap2 开局规则至今仍未被完全求解。',
+      source: 'https://en.wikipedia.org/wiki/Gomoku'
+    },
+    {
+      title: '早期棋类 AI',
+      text: '1962 年，Joseph Weizenbaum 就写过一篇文章，介绍如何让计算机下五子棋并击败初学者。',
+      source: 'https://en.wikipedia.org/wiki/Gomoku'
+    },
+    {
+      title: '复杂度很高',
+      text: '广义五子棋与计算复杂性研究关系很深，相关问题后来被证明属于 PSPACE-complete。',
+      source: 'https://en.wikipedia.org/wiki/Gomoku'
+    }
+  ],
+  hard: [
+    {
+      title: '职业开局',
+      text: '职业五子棋比赛会用专门的开局规则来平衡先手优势，世界锦标赛自 2009 年起使用 Swap2。',
+      source: 'https://en.wikipedia.org/wiki/Gomoku'
+    },
+    {
+      title: 'Gomocup',
+      text: 'Gomocup 是面向五子棋 AI 的年度赛事，从 2000 年开始每年举行一次。',
+      source: 'https://gomocup.org/'
+    },
+    {
+      title: 'AI 与人类',
+      text: '在 2017 年的公开对抗中，程序 Yixin 以 2 比 0 击败了当时的人类世界冠军。',
+      source: 'https://en.wikipedia.org/wiki/Gomoku'
+    },
+    {
+      title: '比赛分组',
+      text: '现在的 Gomocup 不只比一种规则，常见分组包括 freestyle、standard、renju 和 caro。',
+      source: 'https://gomocup.org/results/gomocup-result-2025/'
+    },
+    {
+      title: '电脑赛事很早',
+      text: 'Computer Olympiad 在 1989 年就收录过五子棋项目，之后又有专门的 Renju 电脑世界赛。',
+      source: 'https://en.wikipedia.org/wiki/Gomoku'
+    }
+  ],
+  expert: [
+    {
+      title: '连珠这个名字',
+      text: '“连珠”这个名称由日本记者黑岩泪香于 1899 年正式提出，原意是“连起来的珍珠”。',
+      source: 'https://en.wikipedia.org/wiki/Renju'
+    },
+    {
+      title: '职业分支',
+      text: '连珠可以看作五子棋的职业化分支，它保留了五子连线目标，但额外加入了平衡先手的规则。',
+      source: 'https://en.wikipedia.org/wiki/Renju'
+    },
+    {
+      title: '三类黑方禁手',
+      text: '连珠里黑方不能下出双三、双四和长连，这三类限制统称为黑方禁手。',
+      source: 'https://en.wikipedia.org/wiki/Renju'
+    },
+    {
+      title: '黑白胜法不同',
+      text: '连珠中黑方必须正好五连才能获胜，白方则可以用五连以上或逼出黑方禁手来赢棋。',
+      source: 'https://en.wikipedia.org/wiki/Renju'
+    },
+    {
+      title: '允许停一手',
+      text: '连珠规则允许“停着”，如果双方连续停着，整局会判作和棋。',
+      source: 'https://en.wikipedia.org/wiki/Renju'
+    }
+  ],
+  joseki: [
+    {
+      title: '开局长度',
+      text: 'RIF 对连珠开局规则的要求之一，是开局阶段不要超过 5 手。',
+      source: 'https://en.wikipedia.org/wiki/Renju'
+    },
+    {
+      title: '二十六开局',
+      text: '连珠理论里有 26 个规范开局，这也是很多开局研究和命名系统的基础。',
+      source: 'https://gomoku.renju.net/openings/'
+    },
+    {
+      title: '直开与斜开',
+      text: '这 26 个开局通常分成两大类：13 个直开和 13 个斜开。',
+      source: 'https://gomoku.renju.net/openings/'
+    },
+    {
+      title: '开局有名字',
+      text: '这些开局并不是编号而已，它们各自还有名字，例如 Chosei、Suigetsu、Kansei、Kagetsu。',
+      source: 'https://gomoku.renju.net/openings/'
+    },
+    {
+      title: '国际组织',
+      text: 'Renju International Federation 成立于 1988 年 8 月 8 日，地点是瑞典斯德哥尔摩。',
+      source: 'https://en.wikipedia.org/wiki/Renju'
+    },
+    {
+      title: '世界赛传统',
+      text: '连珠世界锦标赛自 1989 年起按双年周期举办，女子和团体世界赛也都已经形成了固定体系。',
+      source: 'https://en.wikipedia.org/wiki/Renju'
+    },
+    {
+      title: '还有未解空间',
+      text: '自由连珠在 2001 年已被证明为先手胜，但带现代开局规则的连珠仍然没有被完全解完。',
+      source: 'https://en.wikipedia.org/wiki/Renju'
+    }
+  ]
+};
+
 let state = null;
 let busy = false;
 let currentMode = 'ai';
@@ -27,6 +238,7 @@ let dropFrames = [];
 let rafId = null;
 let flashTimer = null;
 let resultTimer = null;
+let triviaSeed = 0;
 
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
@@ -67,6 +279,7 @@ async function startGame(mode, diff) {
 
   currentMode = mode;
   currentDiff = diff;
+  triviaSeed += 1;
   hintPos = null;
   moveHistory = [];
   setDiffPanel(false);
@@ -77,8 +290,10 @@ async function startGame(mode, diff) {
   showView('view-game');
 
   const key = mode === 'pvp' ? 'pvp' : diff;
-  document.getElementById('mode-label').textContent = MODE_TEXT[key] || key;
+  document.getElementById('mode-label').textContent = DISPLAY_MODE_TEXT[key] || key;
   showAlgoDetail(mode, diff);
+  updatePredictionPanel(null);
+  updateTriviaPanel({ mode, difficulty: diff });
 
   setLoading(true);
   try {
@@ -228,6 +443,8 @@ function applyState(data, options = {}) {
   updateTurnIndicator(data);
   updateButtons();
   updateReviewUI();
+  updatePredictionPanel(data);
+  updateTriviaPanel(data);
 
   if (action === 'new' && data.ok) {
     setFlash('新对局已开始。');
@@ -237,6 +454,18 @@ function applyState(data, options = {}) {
     setFlash(data.message || '当前不能这样操作。');
   } else {
     setFlash('', 0);
+  }
+
+  if (action === 'undo' && !data.ok) {
+    const friendlyMessage = humanizeMessage(data.message);
+    if (friendlyMessage) {
+      setFlash(friendlyMessage);
+    }
+  } else if (!data.ok) {
+    const friendlyMessage = humanizeMessage(data.message);
+    if (friendlyMessage) {
+      setFlash(friendlyMessage);
+    }
   }
 
   startRaf();
@@ -390,6 +619,86 @@ function updateButtons() {
   reviewBtn.disabled = !canReview;
 
   canvas.classList.toggle('locked', busy || reviewState.open);
+}
+
+function updatePredictionPanel(data) {
+  const blackEl = document.getElementById('prediction-black');
+  const whiteEl = document.getElementById('prediction-white');
+  const labelEl = document.getElementById('prediction-label');
+  const scoreEl = document.getElementById('prediction-score');
+  const blackBarEl = document.getElementById('prediction-bar-black');
+  const whiteBarEl = document.getElementById('prediction-bar-white');
+
+  if (!data) {
+    blackEl.textContent = '--';
+    whiteEl.textContent = '--';
+    labelEl.textContent = '等待对局';
+    scoreEl.textContent = '估值 --';
+    blackBarEl.style.width = '50%';
+    whiteBarEl.style.width = '50%';
+    return;
+    blackEl.textContent = '--';
+    whiteEl.textContent = '--';
+    labelEl.textContent = '等待对局';
+    scoreEl.textContent = '估值 --';
+    return;
+  }
+
+  const blackRate = Number(data.blackWinRate ?? 50);
+  const whiteRate = Number(data.whiteWinRate ?? (100 - blackRate));
+  blackEl.textContent = `${blackRate}%`;
+  whiteEl.textContent = `${whiteRate}%`;
+  labelEl.textContent = labelFromRate(blackRate);
+  scoreEl.textContent = `估值 ${data.positionScore}`;
+  blackBarEl.style.width = `${blackRate}%`;
+  whiteBarEl.style.width = `${whiteRate}%`;
+  return;
+  blackEl.textContent = `${data.blackWinRate}%`;
+  whiteEl.textContent = `${data.whiteWinRate}%`;
+  labelEl.textContent = data.positionLabel || '均势';
+  scoreEl.textContent = `估值 ${data.positionScore}`;
+}
+
+function updateTriviaPanel(data) {
+  const titleEl = document.getElementById('trivia-title');
+  const textEl = document.getElementById('trivia-text');
+
+  if (!data) {
+    titleEl.textContent = '等待对局开始';
+    textEl.textContent = '开始一局后，这里会显示一条和五子棋相关的小知识。';
+    return;
+    titleEl.textContent = '等待对局开始';
+    textEl.textContent = '进入一局后，这里会显示一条和当前模式相关的小知识。';
+    return;
+  }
+
+  const key = data.mode === 'pvp' ? 'pvp' : (data.difficulty || currentDiff);
+  const item = pickTriviaItem(key);
+  titleEl.textContent = item.title;
+  textEl.textContent = item.text;
+}
+
+function pickTriviaItem(key) {
+  const pool = TRIVIA_FACTS_BY_KEY[key] || TRIVIA_FACTS_BY_KEY.easy;
+  const index = ((triviaSeed - 1) % pool.length + pool.length) % pool.length;
+  return pool[index];
+}
+
+function labelFromRate(blackRate) {
+  if (Math.abs(blackRate - 50) <= 5) return '均势';
+  return blackRate > 55 ? '黑优' : '白优';
+}
+
+function humanizeMessage(message) {
+  const MAP = {
+    no_undo: '当前没有可悔棋的步骤。',
+    game_over_review: '对局已结束，请通过复盘查看。',
+    game_over: '游戏已经结束，请重新开始。',
+    out_of_range: '坐标越界。',
+    occupied: '该位置已有棋子。',
+    wait_ai: '请等待 AI 落子。'
+  };
+  return MAP[message] || '';
 }
 
 function updateReviewUI() {
@@ -648,3 +957,5 @@ canvas.addEventListener('click', (event) => {
 
 drawBoardSurface(ctx);
 updateButtons();
+updatePredictionPanel(null);
+updateTriviaPanel(null);

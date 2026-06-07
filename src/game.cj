@@ -169,6 +169,39 @@ class GameState {
         return score
     }
 
+    func positionScoreForBlack(): Int64 {
+        if (this.gameOver) {
+            if (this.winner == 1) { return 1_000_000 }
+            if (this.winner == 2) { return -1_000_000 }
+            return 0
+        }
+        return -this.evaluate()
+    }
+
+    func clampRate(rate: Int64): Int64 {
+        if (rate < 5) { return 5 }
+        if (rate > 95) { return 95 }
+        return rate
+    }
+
+    func blackWinRateEstimate(): Int64 {
+        if (this.gameOver) {
+            if (this.winner == 1) { return 100 }
+            if (this.winner == 2) { return 0 }
+            return 50
+        }
+
+        let blackAdvantage = this.positionScoreForBlack()
+        let blackRate = 50 + 45 * blackAdvantage / (abs64(blackAdvantage) + 4000)
+        return this.clampRate(blackRate)
+    }
+
+    func positionLabelForRate(blackRate: Int64): String {
+        if (abs64(blackRate - 50) <= 5) { return "even" }
+        if (blackRate > 55) { return "black" }
+        return "white"
+    }
+
     func candidatesN(maxCands: Int64): Array<Point> {
         if (this.moveCount == 0) {
             return Array<Point>(1, { _ => Point(CENTER, CENTER) })
@@ -558,8 +591,8 @@ class GameState {
     // --- Player API ---
 
     func undo(): ApiResult {
-        if (this.histCount == 0) { return ApiResult(false, "没有可悔棋的步骤") }
-        if (this.gameOver) { return ApiResult(false, "对局已结束，请通过复盘查看") }
+        if (this.histCount == 0) { return ApiResult(false, "no_undo") }
+        if (this.gameOver) { return ApiResult(false, "game_over_review") }
 
         let stepsToUndo = if (this.mode == "ai" && this.histCount >= 2) { 2 } else { 1 }
         let target = this.histCount - stepsToUndo
@@ -577,7 +610,7 @@ class GameState {
         this.lastCol = -1
         this.gameOver = false
         this.winner = 0
-        return ApiResult(true, "悔棋成功")
+        return ApiResult(true, "undo_ok")
     }
 
     func hint(): Point {
@@ -599,10 +632,10 @@ class GameState {
     }
 
     func playerMove(row: Int64, col: Int64): ApiResult {
-        if (this.gameOver) { return ApiResult(false, "游戏已经结束，请重新开始") }
-        if (!this.isInside(row, col)) { return ApiResult(false, "坐标越界") }
-        if (this.board[row][col] != 0) { return ApiResult(false, "该位置已有棋子") }
-        if (this.mode == "ai" && this.currentPlayer != 1) { return ApiResult(false, "请等待 AI 落子") }
+        if (this.gameOver) { return ApiResult(false, "game_over") }
+        if (!this.isInside(row, col)) { return ApiResult(false, "out_of_range") }
+        if (this.board[row][col] != 0) { return ApiResult(false, "occupied") }
+        if (this.mode == "ai" && this.currentPlayer != 1) { return ApiResult(false, "wait_ai") }
 
         this.histBoards[this.histCount] = this.copyBoard()
         this.histPlayers[this.histCount] = this.currentPlayer
@@ -615,10 +648,10 @@ class GameState {
             this.histCount += 1
             let ai = this.chooseAiMove()
             this.placeCurrentStone(ai.row, ai.col)
-            return ApiResult(true, "你已落子，AI 已应手")
+            return ApiResult(true, "move_and_ai")
         }
 
-        return ApiResult(true, "落子成功")
+        return ApiResult(true, "move_ok")
     }
 
     // --- Serialization ---
@@ -639,6 +672,10 @@ class GameState {
     }
 
     func stateJson(ok: Bool, message: String): String {
+        let positionScore = this.positionScoreForBlack()
+        let blackWinRate = this.blackWinRateEstimate()
+        let whiteWinRate = 100 - blackWinRate
+        let positionLabel = this.positionLabelForRate(blackWinRate)
         return "{"
             + "\"ok\":" + boolJson(ok) + ","
             + "\"message\":\"" + message + "\","
@@ -652,6 +689,10 @@ class GameState {
             + "\"lastRow\":" + "${this.lastRow}" + ","
             + "\"lastCol\":" + "${this.lastCol}" + ","
             + "\"histCount\":" + "${this.histCount}" + ","
+            + "\"positionScore\":" + "${positionScore}" + ","
+            + "\"blackWinRate\":" + "${blackWinRate}" + ","
+            + "\"whiteWinRate\":" + "${whiteWinRate}" + ","
+            + "\"positionLabel\":\"" + positionLabel + "\","
             + "\"board\":" + this.boardJson()
             + "}"
     }

@@ -137,6 +137,38 @@
             <button id="review-next-btn" class="result-btn" onclick="stepReview(1)">下一步</button>
           </div>
         </section>
+
+        <div class="sidebar-insights">
+          <section id="prediction-panel" class="insight-card prediction-panel">
+            <p class="card-kicker">局势预测</p>
+            <div class="prediction-split">
+              <div class="prediction-side">
+                <span class="prediction-name">黑</span>
+                <strong id="prediction-black" class="prediction-rate">50%</strong>
+              </div>
+              <div class="prediction-divider"></div>
+              <div class="prediction-side">
+                <span class="prediction-name">白</span>
+                <strong id="prediction-white" class="prediction-rate">50%</strong>
+              </div>
+            </div>
+            <div class="prediction-bar" aria-hidden="true">
+              <div id="prediction-bar-black" class="prediction-bar-fill prediction-bar-black" style="width: 50%"></div>
+              <div id="prediction-bar-white" class="prediction-bar-fill prediction-bar-white" style="width: 50%"></div>
+            </div>
+            <div class="prediction-meta">
+              <span id="prediction-label" class="prediction-label">均势</span>
+              <span id="prediction-score" class="prediction-score">估值 0</span>
+            </div>
+            <p class="prediction-foot">按当前局面估算，仅供参考。</p>
+          </section>
+
+          <section id="trivia-panel" class="insight-card trivia-panel">
+            <p class="card-kicker">趣闻</p>
+            <h3 id="trivia-title" class="trivia-title">等待对局开始</h3>
+            <p id="trivia-text" class="trivia-text">进入一局后，这里会显示一条和当前模式相关的小知识。</p>
+          </section>
+        </div>
       </aside>
     </section>
 

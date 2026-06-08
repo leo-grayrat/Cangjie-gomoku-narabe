@@ -8,6 +8,23 @@
 </head>
 <body>
 
+<aside id="music-panel" class="music-panel" aria-label="背景音乐">
+  <button id="music-toggle" class="music-toggle" type="button">音乐 关</button>
+  <div class="music-copy">
+    <span id="music-label" class="music-label">Main</span>
+    <strong id="music-title" class="music-title">等待曲目</strong>
+    <span id="music-artist" class="music-artist">--</span>
+    <label class="music-volume">
+      <span>音量</span>
+      <input id="music-volume" type="range" min="0" max="100" value="100" />
+    </label>
+    <span class="music-links">
+      <a id="music-netease" href="#" target="_blank" rel="noreferrer">网易云</a>
+      <a id="music-qq" href="#" target="_blank" rel="noreferrer">QQ音乐</a>
+    </span>
+  </div>
+</aside>
+
 <div id="view-home" class="view active">
   <main class="home-shell">
     <section class="home-intro">
@@ -320,6 +337,7 @@
   </div>
 </div>
 
+<script src="/music.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

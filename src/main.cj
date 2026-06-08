@@ -148,6 +148,16 @@ func handleRequest(request: String): Array<Byte> {
     if (path == "/app.js") {
         return serveFile("frontend/app.js", "application/javascript; charset=utf-8")
     }
+    if (path == "/music.js") {
+        return serveFile("frontend/music.js", "application/javascript; charset=utf-8")
+    }
+    if (path == "/api/music") {
+        return jsonResponse(musicManifestJson())
+    }
+    match (musicFileResponse(path)) {
+        case Some(response) => return response
+        case None => ()
+    }
 
     if (path == "/api/state") {
         synchronized(stateMutex) {

@@ -217,6 +217,17 @@ function wait(ms) {
   });
 }
 
+function syncMusicContext(extra = {}) {
+  if (!window.gomokuMusic) return;
+
+  const homeActive = document.getElementById('view-home').classList.contains('active');
+  window.gomokuMusic.syncMusic({
+    view: extra.view || (homeActive ? 'home' : 'game'),
+    mode: extra.mode || (state ? state.mode : currentMode),
+    difficulty: extra.difficulty || (state ? state.difficulty : currentDiff)
+  });
+}
+
 function prefersReducedMotion() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
@@ -371,6 +382,9 @@ function noteAiResponseReady(data, action) {
 function maybeTriggerDiscipline(reason) {
   if (disciplineState.active || isModeLocked()) return;
   localStorage.setItem(DISCIPLINE_PENDING_KEY, reason || DISCIPLINE_LOCK_REASON);
+  if (window.gomokuMusic) {
+    window.gomokuMusic.forceTrack('sp');
+  }
   runDisciplineSequence(reason || DISCIPLINE_LOCK_REASON);
 }
 
@@ -419,6 +433,7 @@ async function runDisciplineSequence(reason) {
   localStorage.setItem(DISCIPLINE_REASON_KEY, DISCIPLINE_LOCK_REASON);
   goHome(true);
   applyModeLockUI();
+  syncMusicContext({ view: 'home' });
 }
 
 function checkEasyUnlock(data) {
@@ -431,6 +446,10 @@ function checkEasyUnlock(data) {
   localStorage.removeItem(DISCIPLINE_PENDING_KEY);
   resetDisciplineTracking();
   applyModeLockUI();
+  if (window.gomokuMusic) {
+    window.gomokuMusic.clearForcedTrack();
+  }
+  syncMusicContext();
   setFlash(DISCIPLINE_UNLOCK_TEXT, 5200);
 }
 
@@ -596,6 +615,7 @@ function prepareGameView(mode, diff) {
   updatePredictionPanel(null);
   updateTriviaPanel({ mode, difficulty: diff });
   updateDisciplineOmen({ mode, difficulty: diff });
+  syncMusicContext({ view: 'game', mode, difficulty: diff });
   if (mode !== 'lan') {
     hideLanRoomPanel();
   }
@@ -640,6 +660,7 @@ function goHome(force = false) {
   showView('view-home');
   refreshLanHomeHint();
   applyModeLockUI();
+  syncMusicContext({ view: 'home' });
 }
 
 async function api(url) {
@@ -1082,6 +1103,7 @@ function applyState(data, options = {}) {
   updateTriviaPanel(data);
   updateDisciplineOmen(data);
   noteAiResponseReady(data, action);
+  syncMusicContext({ view: 'game', mode: data.mode, difficulty: data.difficulty });
 
   if (remoteReset) {
     setFlash('房间已重开。');
@@ -1612,3 +1634,4 @@ updateTriviaPanel(null);
 refreshLanHomeHint();
 applyModeLockUI();
 resumePendingDisciplineSequence();
+syncMusicContext({ view: 'home' });

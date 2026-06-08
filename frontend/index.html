@@ -22,6 +22,7 @@
           进入对局后，棋盘下方会显示当前模式对应的算法说明。
         </p>
       </div>
+      <p id="discipline-home-note" class="discipline-home-note hidden"></p>
     </section>
 
     <aside class="launch-panel">
@@ -30,7 +31,7 @@
       </div>
 
       <div class="launch-actions">
-        <button class="mode-btn mode-btn-primary" onclick="startGame('pvp', 'easy')">
+        <button class="mode-btn mode-btn-primary" data-discipline-lock="true" onclick="startGame('pvp', 'easy')">
           <span class="mode-name">本地双人</span>
           <span class="mode-desc">两位玩家共用同一张棋盘，轮流落子。</span>
         </button>
@@ -47,26 +48,26 @@
               <span class="diff-name">Easy</span>
               <span class="diff-tag">贪心</span>
             </button>
-            <button class="diff-btn" onclick="startGame('ai', 'medium')">
+            <button class="diff-btn" data-discipline-lock="true" onclick="startGame('ai', 'medium')">
               <span class="diff-name">Medium</span>
               <span class="diff-tag">Minimax</span>
             </button>
-            <button class="diff-btn" onclick="startGame('ai', 'hard')">
+            <button class="diff-btn" data-discipline-lock="true" onclick="startGame('ai', 'hard')">
               <span class="diff-name">Hard</span>
               <span class="diff-tag">Alpha-Beta</span>
             </button>
-            <button class="diff-btn" onclick="startGame('ai', 'expert')">
+            <button class="diff-btn" data-discipline-lock="true" onclick="startGame('ai', 'expert')">
               <span class="diff-name">Expert</span>
               <span class="diff-tag">战术预检</span>
             </button>
-            <button class="diff-btn" onclick="startGame('ai', 'joseki')">
+            <button class="diff-btn" data-discipline-lock="true" onclick="startGame('ai', 'joseki')">
               <span class="diff-name">Joseki</span>
               <span class="diff-tag">开局定式</span>
             </button>
           </div>
         </div>
 
-        <button class="mode-btn" onclick="toggleLanPanel()">
+        <button class="mode-btn" data-discipline-lock="true" onclick="toggleLanPanel()">
           <span class="mode-name">局域网联机</span>
           <span class="mode-desc">创建房间或输入房间号，和同一局域网内的玩家对局。</span>
           <span class="chevron" id="lan-chevron">›</span>
@@ -81,7 +82,7 @@
                 <button class="lan-copy-btn" type="button" onclick="copyCurrentAddress()">复制地址</button>
               </div>
             </div>
-            <button class="diff-btn" onclick="startLanHost()">
+            <button class="diff-btn" data-discipline-lock="true" onclick="startLanHost()">
               <span class="diff-name">创建房间</span>
               <span class="diff-tag">房主执黑</span>
             </button>
@@ -93,7 +94,7 @@
                 maxlength="12"
                 placeholder="输入房间号"
               />
-              <button class="diff-btn lan-join-btn" onclick="joinLanRoom()">
+              <button class="diff-btn lan-join-btn" data-discipline-lock="true" onclick="joinLanRoom()">
                 <span class="diff-name">加入房间</span>
                 <span class="diff-tag">客方执白</span>
               </button>
@@ -169,6 +170,9 @@
         </div>
 
         <p id="action-message" class="action-message"></p>
+        <p id="discipline-omen" class="discipline-omen hidden">
+          据说一直悔棋、提示或秒下棋，好像会有不好的事情发生……
+        </p>
 
         <section id="result-panel" class="result-panel hidden">
           <div id="result-icon" class="result-icon">●</div>
@@ -307,6 +311,13 @@
       </div>
     </section>
   </main>
+</div>
+
+<div id="discipline-overlay" class="discipline-overlay hidden" aria-live="assertive" aria-modal="true" role="dialog">
+  <div class="discipline-dialog">
+    <p class="discipline-speaker">守棋人</p>
+    <p id="discipline-line" class="discipline-line"></p>
+  </div>
 </div>
 
 <script src="/app.js"></script>

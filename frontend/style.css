@@ -66,6 +66,91 @@ button:focus-visible {
   display: none !important;
 }
 
+.discipline-home-note {
+  max-width: 38rem;
+  margin: var(--space-6) 0 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid color-mix(in oklab, var(--color-brass) 42%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklab, var(--color-brass) 10%, var(--color-card) 90%);
+  color: var(--color-paper-soft);
+  font-size: var(--text-sm);
+}
+
+.discipline-sequence {
+  cursor: wait;
+}
+
+.discipline-sequence .view {
+  pointer-events: none;
+}
+
+.discipline-flash::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in oklab, var(--color-brass) 18%, transparent) 0, transparent 36%),
+    color-mix(in oklab, var(--color-paper) 12%, transparent);
+  animation: disciplineFlash 2.4s var(--ease-in-out) both;
+}
+
+.discipline-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+  background: #020203;
+  color: var(--color-paper);
+}
+
+.discipline-dialog {
+  width: min(680px, 100%);
+  text-align: center;
+}
+
+.discipline-speaker {
+  margin: 0 0 var(--space-5);
+  color: color-mix(in oklab, var(--color-brass) 84%, white 16%);
+  font-size: var(--text-xs);
+  letter-spacing: 0.18em;
+}
+
+.discipline-line {
+  min-height: 8.5rem;
+  margin: 0;
+  color: var(--color-paper);
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 4vw, 2.35rem);
+  line-height: 1.5;
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 1.4s var(--ease-in-out),
+    transform 1.4s var(--ease-in-out);
+}
+
+.discipline-line.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@keyframes disciplineFlash {
+  0%, 100% {
+    opacity: 0;
+  }
+  12%, 38%, 64%, 86% {
+    opacity: 0.18;
+  }
+  24%, 50%, 74% {
+    opacity: 0.04;
+  }
+}
+
 .home-shell,
 .game-shell {
   width: min(1220px, calc(100vw - 40px));
@@ -220,6 +305,25 @@ button:focus-visible {
 
 .mode-btn:hover::before {
   width: 100%;
+}
+
+.mode-btn:disabled,
+.diff-btn:disabled,
+.mode-locked {
+  cursor: not-allowed;
+  opacity: 0.42;
+  transform: none;
+}
+
+.mode-btn:disabled:hover,
+.diff-btn:disabled:hover,
+.mode-locked:hover {
+  transform: none;
+}
+
+.mode-btn:disabled::before,
+.mode-locked::before {
+  width: 0;
 }
 
 .mode-name {
@@ -662,6 +766,13 @@ button:focus-visible {
   font-size: var(--text-sm);
 }
 
+.discipline-omen {
+  margin: calc(var(--space-2) * -1) 0 var(--space-1);
+  color: color-mix(in oklab, var(--color-brass) 72%, var(--color-paper-dim) 28%);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
 .prediction-panel {
   background:
     linear-gradient(180deg,
@@ -1012,5 +1123,18 @@ button:focus-visible {
   .frame-title,
   .mode-label {
     min-width: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discipline-flash::before {
+    animation: none;
+    opacity: 0;
+  }
+
+  .discipline-line {
+    transition:
+      opacity 0.05s linear,
+      transform 0.05s linear;
   }
 }

@@ -7,6 +7,35 @@ const RADIUS = 14;
 const BOARD_PX = PAD * 2 + CELL * (SIZE - 1);
 
 const DEFAULT_LAN_HOME_NOTE = '联机双方需要访问同一台服务器地址，例如同一局域网内的 http://主机IP:8080/。';
+const DISCIPLINE_LOCK_KEY = 'gomokuModeLock';
+const DISCIPLINE_REASON_KEY = 'gomokuModeLockReason';
+const DISCIPLINE_PENDING_KEY = 'gomokuDisciplinePending';
+const DISCIPLINE_LOCK_VALUE = 'easy-only';
+const DISCIPLINE_LOCK_REASON = 'discipline';
+const DISCIPLINE_LOCK_TEXT = '守棋人暂时收起了其它棋桌。先在 Easy 赢下一局，把这盘棋认真下完，门会重新打开。';
+const DISCIPLINE_UNLOCK_TEXT = '守棋人点了点头。其它棋桌已经重新开放。';
+const DISCIPLINE_OMEN_TEXT = '据说一直悔棋、提示或秒下棋，好像会有不好的事情发生……';
+const DISCIPLINE_LINES = [
+  '哦……你来了。',
+  '看来，你是被“再来一次”和“帮我看看”的念头带到这里的。',
+  '这张棋盘不是抽奖机。每一次落子，都应该是你愿意承担的一步。',
+  '悔棋可以用来学习，不适合用来把一盘棋揉成没有结果的纸团。',
+  '提示可以照亮一个位置，但不能替你尊重这局棋。',
+  '如果只是不断重来、不断试探、不断让别人替你判断，游戏会慢慢失去味道。',
+  '一局棋不一定要漂亮。它可以有迟疑，可以有错手，也可以有后来才看懂的地方。',
+  '把一盘棋下完。赢也好，输也好，至少那是你自己的棋。'
+];
+
+const DISCIPLINE_LIMITS = {
+  undoWindowMs: 90000,
+  undoLimit: 6,
+  hintTurnWindow: 12,
+  hintLimit: 5,
+  responseSamples: 6,
+  fastResponseMs: 800,
+  fastResponseLimit: 5,
+  responseTotalMs: 5000
+};
 
 const DISPLAY_MODE_TEXT = {
   pvp: '本地双人',
@@ -157,7 +186,16 @@ let dropFrames = [];
 let rafId = null;
 let flashTimer = null;
 let resultTimer = null;
+let homeDisciplineTimer = null;
 let triviaSeed = 0;
+let disciplineState = {
+  active: false,
+  undoTimes: [],
+  hintTurns: [],
+  responseTimes: [],
+  aiReadyAt: null,
+  playerTurnSerial: 0
+};
 let lanSession = {
   active: false,
   roomId: '',
@@ -172,6 +210,238 @@ const ctx = canvas.getContext('2d');
 
 canvas.width = BOARD_PX;
 canvas.height = BOARD_PX;
+
+function wait(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function prefersReducedMotion() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function isModeLocked() {
+  return localStorage.getItem(DISCIPLINE_LOCK_KEY) === DISCIPLINE_LOCK_VALUE;
+}
+
+function setHomeDisciplineNote(message, timeout = 0) {
+  const note = document.getElementById('discipline-home-note');
+  if (!note) return;
+
+  if (homeDisciplineTimer) {
+    clearTimeout(homeDisciplineTimer);
+    homeDisciplineTimer = null;
+  }
+
+  note.textContent = message || '';
+  note.classList.toggle('hidden', !message);
+
+  if (message && timeout > 0) {
+    homeDisciplineTimer = window.setTimeout(() => {
+      note.textContent = '';
+      note.classList.add('hidden');
+      homeDisciplineTimer = null;
+    }, timeout);
+  }
+}
+
+function applyModeLockUI() {
+  const locked = isModeLocked();
+  document.querySelectorAll('[data-discipline-lock="true"]').forEach((button) => {
+    button.disabled = locked;
+    button.classList.toggle('mode-locked', locked);
+  });
+
+  if (locked) {
+    setHomeDisciplineNote(DISCIPLINE_LOCK_TEXT);
+  } else if (!homeDisciplineTimer) {
+    setHomeDisciplineNote('');
+  }
+}
+
+function modeAllowedByDiscipline(mode, diff) {
+  return !isModeLocked() || (mode === 'ai' && diff === 'easy');
+}
+
+function blockLockedMode() {
+  applyModeLockUI();
+  setHomeDisciplineNote(DISCIPLINE_LOCK_TEXT);
+  showView('view-home');
+  return false;
+}
+
+function resetDisciplineTracking() {
+  disciplineState.undoTimes = [];
+  disciplineState.hintTurns = [];
+  disciplineState.responseTimes = [];
+  disciplineState.aiReadyAt = null;
+  disciplineState.playerTurnSerial = 0;
+}
+
+function shouldTrackDiscipline() {
+  return !!state
+    && state.mode === 'ai'
+    && !state.gameOver
+    && !disciplineState.active
+    && !isModeLocked();
+}
+
+function updateDisciplineOmen(data) {
+  const omen = document.getElementById('discipline-omen');
+  if (!omen) return;
+  const visible = !!data && data.mode === 'ai' && !disciplineState.active && !isModeLocked();
+  omen.textContent = DISCIPLINE_OMEN_TEXT;
+  omen.classList.toggle('hidden', !visible);
+}
+
+function trimRecentTimes(times, now, windowMs) {
+  return times.filter((time) => now - time <= windowMs);
+}
+
+function recordUndoSuccess() {
+  if (!shouldTrackDiscipline()) return;
+
+  const now = Date.now();
+  disciplineState.undoTimes = trimRecentTimes(disciplineState.undoTimes, now, DISCIPLINE_LIMITS.undoWindowMs);
+  disciplineState.undoTimes.push(now);
+
+  if (disciplineState.undoTimes.length >= DISCIPLINE_LIMITS.undoLimit) {
+    maybeTriggerDiscipline('undo');
+  }
+}
+
+function recordHintSuccess() {
+  if (!shouldTrackDiscipline()) return;
+
+  const minTurn = Math.max(0, disciplineState.playerTurnSerial - DISCIPLINE_LIMITS.hintTurnWindow + 1);
+  disciplineState.hintTurns = disciplineState.hintTurns.filter((turn) => turn >= minTurn);
+  disciplineState.hintTurns.push(disciplineState.playerTurnSerial);
+
+  if (disciplineState.hintTurns.length >= DISCIPLINE_LIMITS.hintLimit) {
+    maybeTriggerDiscipline('hint');
+  }
+}
+
+function measurePendingPlayerResponse() {
+  if (!shouldTrackDiscipline() || !disciplineState.aiReadyAt || !isHumanTurn(state)) {
+    return null;
+  }
+  return {
+    ms: Date.now() - disciplineState.aiReadyAt,
+    readyAt: disciplineState.aiReadyAt
+  };
+}
+
+function recordPlayerResponse(response) {
+  if (!shouldTrackDiscipline() || !response) return;
+
+  if (disciplineState.aiReadyAt === response.readyAt) {
+    disciplineState.aiReadyAt = null;
+  }
+  disciplineState.responseTimes.push(response.ms);
+  if (disciplineState.responseTimes.length > DISCIPLINE_LIMITS.responseSamples) {
+    disciplineState.responseTimes.shift();
+  }
+
+  if (disciplineState.responseTimes.length < DISCIPLINE_LIMITS.responseSamples) return;
+
+  const fastCount = disciplineState.responseTimes
+    .filter((time) => time <= DISCIPLINE_LIMITS.fastResponseMs)
+    .length;
+  const total = disciplineState.responseTimes.reduce((sum, time) => sum + time, 0);
+
+  if (fastCount >= DISCIPLINE_LIMITS.fastResponseLimit || total <= DISCIPLINE_LIMITS.responseTotalMs) {
+    maybeTriggerDiscipline('speed');
+  }
+}
+
+function noteAiResponseReady(data, action) {
+  if (!data || data.mode !== 'ai' || action === 'new' || action === 'undo' || data.gameOver || isModeLocked()) {
+    disciplineState.aiReadyAt = null;
+    return;
+  }
+
+  if (data.ok && action === 'move' && data.currentPlayer === 1) {
+    disciplineState.playerTurnSerial += 1;
+    disciplineState.aiReadyAt = Date.now();
+  }
+}
+
+function maybeTriggerDiscipline(reason) {
+  if (disciplineState.active || isModeLocked()) return;
+  localStorage.setItem(DISCIPLINE_PENDING_KEY, reason || DISCIPLINE_LOCK_REASON);
+  runDisciplineSequence(reason || DISCIPLINE_LOCK_REASON);
+}
+
+async function runDisciplineSequence(reason) {
+  if (disciplineState.active || isModeLocked()) return;
+
+  disciplineState.active = true;
+  localStorage.setItem(DISCIPLINE_PENDING_KEY, reason || DISCIPLINE_LOCK_REASON);
+  setLoading(false);
+  clearResultTimer();
+  hideResult();
+  closeReview(true);
+  setFlash('', 0);
+  updateButtons();
+  updateDisciplineOmen(null);
+
+  document.body.classList.add('discipline-sequence');
+  if (!prefersReducedMotion()) {
+    document.body.classList.add('discipline-flash');
+    await wait(2400);
+    document.body.classList.remove('discipline-flash');
+  }
+
+  const overlay = document.getElementById('discipline-overlay');
+  const line = document.getElementById('discipline-line');
+  overlay.classList.remove('hidden');
+  document.body.classList.add('discipline-blackout');
+
+  for (const text of DISCIPLINE_LINES) {
+    line.classList.remove('visible');
+    await wait(220);
+    line.textContent = text;
+    line.classList.add('visible');
+    await wait(6100);
+    line.classList.remove('visible');
+    await wait(1300);
+  }
+
+  line.textContent = '';
+  overlay.classList.add('hidden');
+  document.body.classList.remove('discipline-sequence', 'discipline-blackout');
+  disciplineState.active = false;
+  resetDisciplineTracking();
+  localStorage.removeItem(DISCIPLINE_PENDING_KEY);
+  localStorage.setItem(DISCIPLINE_LOCK_KEY, DISCIPLINE_LOCK_VALUE);
+  localStorage.setItem(DISCIPLINE_REASON_KEY, DISCIPLINE_LOCK_REASON);
+  goHome(true);
+  applyModeLockUI();
+}
+
+function checkEasyUnlock(data) {
+  if (!isModeLocked()) return;
+  if (!data || data.mode !== 'ai' || data.difficulty !== 'easy') return;
+  if (!data.gameOver || data.winner !== 1) return;
+
+  localStorage.removeItem(DISCIPLINE_LOCK_KEY);
+  localStorage.removeItem(DISCIPLINE_REASON_KEY);
+  localStorage.removeItem(DISCIPLINE_PENDING_KEY);
+  resetDisciplineTracking();
+  applyModeLockUI();
+  setFlash(DISCIPLINE_UNLOCK_TEXT, 5200);
+}
+
+function resumePendingDisciplineSequence() {
+  const pendingReason = localStorage.getItem(DISCIPLINE_PENDING_KEY);
+  if (pendingReason && !isModeLocked()) {
+    window.setTimeout(() => {
+      runDisciplineSequence(pendingReason);
+    }, 300);
+  }
+}
 
 function showView(id) {
   document.querySelectorAll('.view').forEach((view) => {
@@ -201,6 +471,10 @@ function toggleDiffPanel() {
 }
 
 function toggleLanPanel() {
+  if (isModeLocked()) {
+    blockLockedMode();
+    return;
+  }
   const panel = document.getElementById('lan-panel');
   setLanPanel(!panel.classList.contains('open'));
 }
@@ -321,6 +595,7 @@ function prepareGameView(mode, diff) {
   showAlgoDetail(mode, diff);
   updatePredictionPanel(null);
   updateTriviaPanel({ mode, difficulty: diff });
+  updateDisciplineOmen({ mode, difficulty: diff });
   if (mode !== 'lan') {
     hideLanRoomPanel();
   }
@@ -353,7 +628,8 @@ function leaveLanRoom(notifyServer = true) {
   clearLanSession();
 }
 
-function goHome() {
+function goHome(force = false) {
+  if (disciplineState.active && !force) return;
   stopLanPolling();
   leaveLanRoom();
   clearResultTimer();
@@ -363,6 +639,7 @@ function goHome() {
   setFlash('', 0);
   showView('view-home');
   refreshLanHomeHint();
+  applyModeLockUI();
 }
 
 async function api(url) {
@@ -426,11 +703,16 @@ async function pollLanState() {
 }
 
 async function startGame(mode, diff) {
-  if (busy) return;
+  if (busy || disciplineState.active) return;
+  if (!modeAllowedByDiscipline(mode, diff)) {
+    blockLockedMode();
+    return;
+  }
 
   stopLanPolling();
   leaveLanRoom();
   prepareGameView(mode, diff);
+  resetDisciplineTracking();
 
   setLoading(true);
   try {
@@ -444,7 +726,11 @@ async function startGame(mode, diff) {
 }
 
 async function startLanHost() {
-  if (busy) return;
+  if (busy || disciplineState.active) return;
+  if (!modeAllowedByDiscipline('lan', 'lan')) {
+    blockLockedMode();
+    return;
+  }
 
   stopLanPolling();
   leaveLanRoom();
@@ -469,7 +755,11 @@ async function startLanHost() {
 }
 
 async function joinLanRoom() {
-  if (busy) return;
+  if (busy || disciplineState.active) return;
+  if (!modeAllowedByDiscipline('lan', 'lan')) {
+    blockLockedMode();
+    return;
+  }
 
   const input = document.getElementById('lan-room-input');
   const roomId = (input.value || '').trim();
@@ -504,7 +794,7 @@ async function joinLanRoom() {
 }
 
 async function handleLanReset() {
-  if (!lanSession.active) return;
+  if (disciplineState.active || !lanSession.active) return;
   if (lanSession.seat !== 1) {
     setFlash('只有房主可以重新开始本房间。');
     return;
@@ -572,8 +862,9 @@ function updateLanRoomPanel(data) {
 }
 
 async function doMove(row, col) {
-  if (busy || !state || state.gameOver || reviewState.open) return;
+  if (disciplineState.active || busy || !state || state.gameOver || reviewState.open) return;
 
+  const pendingResponseMs = measurePendingPlayerResponse();
   setLoading(true);
   try {
     let data;
@@ -588,6 +879,9 @@ async function doMove(row, col) {
     }
 
     applyState(data, { action: 'move', moveRow: row, moveCol: col });
+    if (data.ok) {
+      recordPlayerResponse(pendingResponseMs);
+    }
   } catch (_error) {
     setFlash('落子失败，请重试。');
   } finally {
@@ -596,23 +890,30 @@ async function doMove(row, col) {
 }
 
 async function handleUndo() {
-  if (busy || !state || reviewState.open || state.mode === 'lan') return;
+  if (disciplineState.active || busy || !state || reviewState.open || state.mode === 'lan') return;
 
+  let recordSuccess = false;
   setLoading(true);
   try {
     const data = await api('/api/undo');
     applyState(data, { action: 'undo' });
+    recordSuccess = !!data.ok;
   } catch (_error) {
     setFlash('悔棋失败，请重试。');
   } finally {
     setLoading(false);
   }
+
+  if (recordSuccess) {
+    recordUndoSuccess();
+  }
 }
 
 async function handleHint() {
-  if (busy || !state || reviewState.open || state.mode === 'lan') return;
+  if (disciplineState.active || busy || !state || reviewState.open || state.mode === 'lan') return;
   if (!isHumanTurn(state)) return;
 
+  let recordSuccess = false;
   setLoading(true);
   try {
     const data = await api('/api/hint');
@@ -621,6 +922,7 @@ async function handleHint() {
       setFlash('建议落点已标出。');
       updateButtons();
       startRaf();
+      recordSuccess = true;
     } else {
       setFlash(humanizeMessage(data.message) || '当前不能请求帮助。');
     }
@@ -629,9 +931,14 @@ async function handleHint() {
   } finally {
     setLoading(false);
   }
+
+  if (recordSuccess) {
+    recordHintSuccess();
+  }
 }
 
 function openReview() {
+  if (disciplineState.active) return;
   if (!state || !state.gameOver || moveHistory.length <= 1) {
     setFlash('只有终局后才能复盘。');
     return;
@@ -646,7 +953,8 @@ function openReview() {
   startRaf();
 }
 
-function closeReview() {
+function closeReview(force = false) {
+  if (disciplineState.active && !force) return;
   reviewState.open = false;
   document.getElementById('review-panel').classList.add('hidden');
   updateReviewUI();
@@ -655,6 +963,7 @@ function closeReview() {
 }
 
 function stepReview(delta) {
+  if (disciplineState.active) return;
   if (!reviewState.open) return;
   const next = Math.max(0, Math.min(moveHistory.length - 1, reviewState.index + delta));
   if (next === reviewState.index) return;
@@ -720,6 +1029,9 @@ function applyState(data, options = {}) {
 
   if (action === 'new' || !prev) {
     moveHistory = [cloneBoard(data.board)];
+    if (data.mode !== 'ai') {
+      resetDisciplineTracking();
+    }
   } else if ((action === 'move' || action === 'poll') && data.ok && diffs.length > 0) {
     appendMoveSnapshots(prev, data, options.moveRow, options.moveCol);
   } else if (action === 'undo' && data.ok) {
@@ -768,6 +1080,8 @@ function applyState(data, options = {}) {
   updateLanRoomPanel(data);
   updatePredictionPanel(data);
   updateTriviaPanel(data);
+  updateDisciplineOmen(data);
+  noteAiResponseReady(data, action);
 
   if (remoteReset) {
     setFlash('房间已重开。');
@@ -781,6 +1095,7 @@ function applyState(data, options = {}) {
     setFlash('', 0);
   }
 
+  checkEasyUnlock(data);
   startRaf();
 }
 
@@ -867,6 +1182,7 @@ function hideResult() {
 }
 
 function restartGame() {
+  if (disciplineState.active) return;
   if (lanSession.active) {
     handleLanReset();
     return;
@@ -923,6 +1239,7 @@ function updateButtons() {
 
   const canUndo = !!state
     && state.mode !== 'lan'
+    && !disciplineState.active
     && !busy
     && !reviewState.open
     && !state.gameOver
@@ -930,17 +1247,20 @@ function updateButtons() {
 
   const canHint = !!state
     && state.mode !== 'lan'
+    && !disciplineState.active
     && !busy
     && !reviewState.open
     && isHumanTurn(state);
 
   const canReview = !!state
+    && !disciplineState.active
     && !busy
     && !reviewState.open
     && state.gameOver
     && moveHistory.length > 1;
 
   const canPlayBoard = !!state
+    && !disciplineState.active
     && !busy
     && !reviewState.open
     && isHumanTurn(state);
@@ -1257,7 +1577,7 @@ function startRaf() {
 }
 
 canvas.addEventListener('click', (event) => {
-  if (busy || !state || state.gameOver || reviewState.open) return;
+  if (disciplineState.active || busy || !state || state.gameOver || reviewState.open) return;
   if (!isHumanTurn(state)) return;
 
   const rect = canvas.getBoundingClientRect();
@@ -1290,3 +1610,5 @@ updateButtons();
 updatePredictionPanel(null);
 updateTriviaPanel(null);
 refreshLanHomeHint();
+applyModeLockUI();
+resumePendingDisciplineSequence();

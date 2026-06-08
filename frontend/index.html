@@ -330,6 +330,21 @@
   </main>
 </div>
 
+<div id="result-modal" class="result-modal hidden" aria-live="assertive" aria-modal="true" role="dialog">
+  <div class="result-modal-card">
+    <button class="result-modal-close" type="button" onclick="dismissResultModal()" aria-label="关闭终局提示">×</button>
+    <p class="result-modal-kicker">终局结果</p>
+    <div id="result-modal-icon" class="result-icon result-modal-icon">●</div>
+    <h2 id="result-modal-title" class="result-modal-title"></h2>
+    <p id="result-modal-text" class="result-modal-text"></p>
+    <div class="result-modal-actions">
+      <button class="result-btn primary" type="button" onclick="openReview()">进入复盘</button>
+      <button class="result-btn" type="button" onclick="restartGame()">再来一局</button>
+      <button class="result-btn quiet" type="button" onclick="dismissResultModal()">继续看棋盘</button>
+    </div>
+  </div>
+</div>
+
 <div id="discipline-overlay" class="discipline-overlay hidden" aria-live="assertive" aria-modal="true" role="dialog">
   <div class="discipline-dialog">
     <p class="discipline-speaker">守棋人</p>

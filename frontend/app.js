@@ -186,6 +186,7 @@ let dropFrames = [];
 let rafId = null;
 let flashTimer = null;
 let resultTimer = null;
+let dismissedResultKey = '';
 let homeDisciplineTimer = null;
 let triviaSeed = 0;
 let disciplineState = {
@@ -396,6 +397,7 @@ async function runDisciplineSequence(reason) {
   setLoading(false);
   clearResultTimer();
   hideResult();
+  hideResultModal(false);
   closeReview(true);
   setFlash('', 0);
   updateButtons();
@@ -607,6 +609,8 @@ function prepareGameView(mode, diff) {
   setLanPanel(false);
   clearResultTimer();
   hideResult();
+  hideResultModal(false);
+  dismissedResultKey = '';
   closeReview();
   setFlash('', 0);
   showView('view-game');
@@ -654,6 +658,7 @@ function goHome(force = false) {
   leaveLanRoom();
   clearResultTimer();
   hideResult();
+  hideResultModal(false);
   closeReview();
   hideLanRoomPanel();
   setFlash('', 0);
@@ -966,6 +971,7 @@ function openReview() {
   }
 
   clearResultTimer();
+  hideResultModal(true);
   reviewState.open = true;
   reviewState.index = moveHistory.length - 1;
   document.getElementById('review-panel').classList.remove('hidden');
@@ -1066,6 +1072,8 @@ function applyState(data, options = {}) {
   if (remoteReset) {
     clearResultTimer();
     hideResult();
+    hideResultModal(false);
+    dismissedResultKey = '';
     closeReview();
   }
 
@@ -1091,6 +1099,8 @@ function applyState(data, options = {}) {
   if (!data.gameOver) {
     clearResultTimer();
     hideResult();
+    hideResultModal(false);
+    dismissedResultKey = '';
   }
 
   updateModeLabel(data.mode, data.difficulty);
@@ -1181,30 +1191,85 @@ function showResult(winner) {
   const panel = document.getElementById('result-panel');
   const icon = document.getElementById('result-icon');
   const title = document.getElementById('result-title');
+  const result = resultContent(winner);
 
-  if (winner === 0) {
-    icon.className = 'result-icon draw';
-    icon.textContent = '和';
-    title.textContent = '本局平局';
-  } else if (winner === 1) {
-    icon.className = 'result-icon black';
-    icon.textContent = '●';
-    title.textContent = '黑子获胜';
-  } else {
-    icon.className = 'result-icon white';
-    icon.textContent = '●';
-    title.textContent = '白子获胜';
-  }
+  icon.className = `result-icon ${result.className}`;
+  icon.textContent = result.icon;
+  title.textContent = result.title;
 
   panel.classList.remove('hidden');
+  showResultModal(winner);
 }
 
 function hideResult() {
   document.getElementById('result-panel').classList.add('hidden');
 }
 
+function resultContent(winner) {
+  if (winner === 0) {
+    return {
+      className: 'draw',
+      icon: '和',
+      title: '本局平局',
+      text: '双方都没有再找到决定胜负的一手。'
+    };
+  }
+  if (winner === 1) {
+    return {
+      className: 'black',
+      icon: '●',
+      title: '黑子获胜',
+      text: '黑子率先连成五子。'
+    };
+  }
+  return {
+    className: 'white',
+    icon: '●',
+    title: '白子获胜',
+    text: '白子率先连成五子。'
+  };
+}
+
+function currentResultKey(winner) {
+  const moves = state && typeof state.moveCount === 'number' ? state.moveCount : moveHistory.length - 1;
+  const room = state && state.mode === 'lan' && lanSession.roomId ? lanSession.roomId : '';
+  return `${state ? state.mode : currentMode}:${state ? state.difficulty : currentDiff}:${room}:${moves}:${winner}`;
+}
+
+function showResultModal(winner) {
+  if (reviewState.open || disciplineState.active) return;
+
+  const key = currentResultKey(winner);
+  if (dismissedResultKey === key) return;
+
+  const modal = document.getElementById('result-modal');
+  const icon = document.getElementById('result-modal-icon');
+  const title = document.getElementById('result-modal-title');
+  const text = document.getElementById('result-modal-text');
+  const result = resultContent(winner);
+
+  icon.className = `result-icon result-modal-icon ${result.className}`;
+  icon.textContent = result.icon;
+  title.textContent = result.title;
+  text.textContent = result.text;
+  modal.classList.remove('hidden');
+}
+
+function hideResultModal(remember = false) {
+  const modal = document.getElementById('result-modal');
+  if (remember && state && state.gameOver) {
+    dismissedResultKey = currentResultKey(state.winner);
+  }
+  modal.classList.add('hidden');
+}
+
+function dismissResultModal() {
+  hideResultModal(true);
+}
+
 function restartGame() {
   if (disciplineState.active) return;
+  hideResultModal(true);
   if (lanSession.active) {
     handleLanReset();
     return;

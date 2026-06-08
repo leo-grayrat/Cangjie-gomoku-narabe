@@ -996,6 +996,109 @@ button:focus-visible {
       var(--color-card) 100%);
 }
 
+.result-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+  background:
+    radial-gradient(circle at 50% 35%, rgba(188, 74, 42, 0.18), transparent 34rem),
+    rgba(9, 11, 10, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.result-modal-card {
+  position: relative;
+  width: min(92vw, 28rem);
+  padding: var(--space-6);
+  text-align: center;
+  background:
+    linear-gradient(180deg,
+      color-mix(in oklab, var(--color-lacquer) 16%, var(--color-card) 84%) 0%,
+      var(--color-card) 100%);
+  border: 1px solid color-mix(in oklab, var(--color-brass) 36%, var(--color-card-line));
+  border-radius: calc(var(--radius-xl) + 0.35rem);
+  box-shadow:
+    0 2rem 4rem rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  animation: resultModalIn 260ms var(--ease-out) both;
+}
+
+.result-modal-close {
+  position: absolute;
+  top: 0.85rem;
+  right: 0.85rem;
+  width: 2.15rem;
+  height: 2.15rem;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--color-card-line);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-paper-soft);
+  cursor: pointer;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.result-modal-close:hover {
+  color: var(--color-paper);
+  border-color: color-mix(in oklab, var(--color-brass) 66%, transparent);
+}
+
+.result-modal-kicker {
+  margin: 0 0 var(--space-3);
+  color: var(--color-brass);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.result-modal-icon {
+  width: 4.2rem;
+  height: 4.2rem;
+  margin-bottom: var(--space-4);
+  font-size: 1.9rem;
+}
+
+.result-modal-title {
+  margin: 0;
+  color: var(--color-paper);
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 7vw, 3.15rem);
+  line-height: 1;
+}
+
+.result-modal-text {
+  margin: var(--space-4) auto var(--space-5);
+  max-width: 20rem;
+  color: var(--color-paper-soft);
+  font-size: var(--text-md);
+}
+
+.result-modal-actions {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.result-btn.quiet {
+  background: transparent;
+  color: var(--color-paper-soft);
+}
+
+@keyframes resultModalIn {
+  from {
+    opacity: 0;
+    transform: translateY(0.8rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .result-icon {
   width: 3.2rem;
   height: 3.2rem;

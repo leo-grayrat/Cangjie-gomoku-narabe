@@ -7,7 +7,7 @@ target/
 
 # Playwright 测试产物
 .playwright-mcp/
-*.png
+
 
 # 编辑器
 .vscode/
